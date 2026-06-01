@@ -23,3 +23,10 @@
 - **mktemp in install.sh**: Used `mktemp -d -p "$HOME"` to avoid /tmp which is forbidden. Delta download uses a temp dir under $HOME.
 - **dotfiles CLI function**: Kept parity with the PowerShell `dotfiles` command behavior described in cheatsheet.md. fzf used for interactive `dotfiles help`, grep/rg for keyword search, jq for `dotfiles list`.
 - **fzf shell integration paths**: Checked both `~/.fzf/` (manual/git install) and `/usr/share/doc/fzf/examples/` (apt install) to load key-bindings and completion.
+
+### 2026-06-01 — Robustness fixes: pipefail + curl/grep + arch detection
+
+- **pipefail + command-substitution gotcha**: Under `set -euo pipefail`, a pipeline inside `$()` can still kill the script if `grep` finds no match — it returns exit code 1 which propagates through the pipe and then through the assignment statement. Fix: append `|| true` to the entire command substitution, then explicitly check `if [ -z "$var" ]` and handle the empty case. This pattern is necessary anywhere you run `curl | grep` to parse headers.
+- **Leaked temp dir on early exit**: When `mktemp` creates a directory before a command that can fail, any early-exit path (including the pipefail abort above) must `rm -rf "$tmp_dir"`. Always pair `mktemp` with a cleanup guard immediately after, or use a `trap` for the function scope.
+- **Arch detection for delta**: delta's release assets use different libc suffixes per arch: x86_64 uses `musl` (statically linked, distro-agnostic), aarch64 uses `gnu`, and armv7 uses `gnueabihf`. Hardcoding `x86_64` silently installs a broken binary on ARM hosts. Pattern: set a `delta_target` variable via `case "$(uname -m)"` covering `aarch64|arm64`, `armv7l|arm`, and default x86_64, then interpolate into the full target triple in the URL.
+- **curl | bash failure isolation**: `curl ... | bash` and `curl ... | sh` as standalone statements abort the whole installer on network failure. Append `|| { warn "..."; return 0; }` so optional tool installs degrade gracefully and the critical shell-wiring steps (write_stub calls) always execute.

@@ -196,7 +196,8 @@ install_zoxide() {
     fi
     # Fallback: official install script
     if has curl; then
-        curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
+        curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash \
+            || { warn "zoxide: install script failed; install manually: https://github.com/ajeetdsouza/zoxide"; return 0; }
         ok "zoxide installed via official script"
     else
         warn "zoxide: curl not found. Install manually."
@@ -210,7 +211,8 @@ install_starship() {
     fi
     info "Installing starship via official script..."
     if has curl; then
-        curl -sS https://starship.rs/install.sh | sh -s -- --yes
+        curl -sS https://starship.rs/install.sh | sh -s -- --yes \
+            || { warn "starship: install script failed; install manually: https://starship.rs"; return 0; }
         ok "starship installed"
     else
         warn "starship: curl not found. Install manually: https://starship.rs/guide/"
@@ -231,9 +233,19 @@ install_delta() {
     tmp_dir="$(mktemp -d -p "${HOME}")"  # uses $HOME, not /tmp
     local latest_url
     latest_url="$(curl -sI https://github.com/dandavison/delta/releases/latest \
-        | grep -i '^location:' | tr -d '\r\n' | sed 's/.*location: //')"
+        | grep -i '^location:' | tr -d '\r\n' | sed 's/.*location: //')" || true
+    if [ -z "$latest_url" ]; then
+        warn "delta: could not resolve latest release URL. Install manually: cargo install git-delta"
+        rm -rf "$tmp_dir"
+        return 0
+    fi
     local version="${latest_url##*/}"
-    local download_url="https://github.com/dandavison/delta/releases/download/${version}/delta-${version}-x86_64-unknown-linux-musl.tar.gz"
+    local delta_target="x86_64-unknown-linux-musl"
+    case "$(uname -m)" in
+        aarch64|arm64) delta_target="aarch64-unknown-linux-gnu" ;;
+        armv7l|arm)    delta_target="arm-unknown-linux-gnueabihf" ;;
+    esac
+    local download_url="https://github.com/dandavison/delta/releases/download/${version}/delta-${version}-${delta_target}.tar.gz"
 
     curl -sL "$download_url" -o "${tmp_dir}/delta.tar.gz" || {
         warn "delta: download failed. Install manually: cargo install git-delta"
@@ -269,7 +281,11 @@ install_yq() {
     esac
     local yq_url
     yq_url="$(curl -sI https://github.com/mikefarah/yq/releases/latest \
-        | grep -i '^location:' | tr -d '\r\n' | sed 's/.*location: //')"
+        | grep -i '^location:' | tr -d '\r\n' | sed 's/.*location: //')" || true
+    if [ -z "$yq_url" ]; then
+        warn "yq: could not resolve latest release URL. Install manually: https://github.com/mikefarah/yq"
+        return 0
+    fi
     local version="${yq_url##*/}"
     local download_url="https://github.com/mikefarah/yq/releases/download/${version}/yq_linux_${arch}"
 
