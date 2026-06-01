@@ -1,0 +1,19 @@
+{
+  "_comment": "Scoop fallback package names. Used by install.ps1 when winget is unavailable or a package fails. Add 'extras' bucket for oh-my-posh/gsudo if not found in main.",
+  "_owner": "Switch",
+  "buckets": ["main", "extras"],
+  "packages": [
+    { "name": "git",       "bucket": "main",   "command": "git",        "description": "Version control" },
+    { "name": "gh",        "bucket": "main",   "command": "gh",         "description": "GitHub CLI" },
+    { "name": "oh-my-posh","bucket": "main",   "command": "oh-my-posh", "description": "Prompt theme engine" },
+    { "name": "gsudo",     "bucket": "extras", "command": "gsudo",      "description": "Sudo for Windows" },
+    { "name": "bat",       "bucket": "main",   "command": "bat",        "description": "cat with syntax highlighting" },
+    { "name": "eza",       "bucket": "main",   "command": "eza",        "description": "Modern ls replacement" },
+    { "name": "fd",        "bucket": "main",   "command": "fd",         "description": "Fast find replacement" },
+    { "name": "ripgrep",   "bucket": "main",   "command": "rg",         "description": "Fast grep replacement" },
+    { "name": "fzf",       "bucket": "main",   "command": "fzf",        "description": "Fuzzy finder" },
+    { "name": "zoxide",    "bucket": "main",   "command": "zoxide",     "description": "Smart cd (z)" },
+    { "name": "delta",     "bucket": "main",   "command": "delta",      "description": "Better git diffs" },
+    { "name": "jq",        "bucket": "main",   "command": "jq",         "description": "JSON processor" }
+  ]
+}

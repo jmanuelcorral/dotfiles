@@ -1,0 +1,19 @@
+{
+  "_comment": "Windows packages installed by bootstrap/install.ps1. Each entry: id=winget ID, command=binary to check (guard), scoop=fallback scoop name.",
+  "_owner": "Switch",
+  "packages": [
+    { "id": "Git.Git",                    "command": "git",        "scoop": "git",       "description": "Version control" },
+    { "id": "GitHub.cli",                 "command": "gh",         "scoop": "gh",        "description": "GitHub CLI" },
+    { "id": "JanDeDobbeleer.OhMyPosh",    "command": "oh-my-posh", "scoop": "oh-my-posh","description": "Prompt theme engine" },
+    { "id": "gerardog.gsudo",             "command": "gsudo",      "scoop": "gsudo",     "description": "Sudo for Windows" },
+    { "id": "sharkdp.bat",                "command": "bat",        "scoop": "bat",       "description": "cat with syntax highlighting" },
+    { "id": "eza-community.eza",          "command": "eza",        "scoop": "eza",       "description": "Modern ls replacement" },
+    { "id": "sharkdp.fd",                 "command": "fd",         "scoop": "fd",        "description": "Fast find replacement" },
+    { "id": "BurntSushi.ripgrep.MSVC",    "command": "rg",         "scoop": "ripgrep",   "description": "Fast grep replacement" },
+    { "id": "junegunn.fzf",               "command": "fzf",        "scoop": "fzf",       "description": "Fuzzy finder" },
+    { "id": "ajeetdsouza.zoxide",         "command": "zoxide",     "scoop": "zoxide",    "description": "Smart cd (z)" },
+    { "id": "dandavison.delta",           "command": "delta",      "scoop": "delta",     "description": "Better git diffs" },
+    { "id": "jqlang.jq",                  "command": "jq",         "scoop": "jq",        "description": "JSON processor" },
+    { "id": "Volta.Volta",                "command": "volta",      "scoop": null,        "description": "Node.js version manager" }
+  ]
+}

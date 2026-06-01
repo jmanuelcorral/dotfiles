@@ -1,0 +1,5 @@
+  {
+    "_comment": "Registry of user tools in bin/. Powers 'dotfiles help' and 'dotfiles list'. Managed by 'dotfiles register <name>'.",
+    "_owner": "Switch",
+    "tools": []
+  }
