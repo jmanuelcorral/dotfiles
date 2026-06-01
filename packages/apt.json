@@ -1,0 +1,63 @@
+{
+  "_comment": "Debian/Ubuntu (WSL Ubuntu) package manifest. Owner: Tank.",
+  "_owner": "Tank",
+
+  "_binary_quirks": {
+    "bat": "apt installs as 'bat' on Ubuntu 22.04+; on older systems the binary is 'batcat' — bootstrap/install.sh creates a ~/.local/bin/bat symlink automatically.",
+    "fd-find": "apt installs as 'fd-find'; the binary is 'fdfind' — bootstrap/install.sh creates a ~/.local/bin/fd symlink automatically.",
+    "eza": "Available in Ubuntu 23.10+ via apt. On older Ubuntu, install via the official eza apt repo (see bootstrap/install.sh) or cargo.",
+    "delta": "Not in Ubuntu apt. Installed from GitHub releases by bootstrap/install.sh.",
+    "starship": "Not in apt. Installed via the official install script: curl -sS https://starship.rs/install.sh | sh",
+    "zoxide": "Available in Ubuntu 22.10+ via apt. On older systems, installed via the official script: curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash",
+    "yq": "mikefarah/yq is not in standard Ubuntu apt. Installed from GitHub releases by bootstrap/install.sh."
+  },
+
+  "apt": [
+    { "name": "git",       "binary": "git",       "description": "Version control" },
+    { "name": "curl",      "binary": "curl",       "description": "HTTP client" },
+    { "name": "wget",      "binary": "wget",       "description": "HTTP downloader" },
+    { "name": "unzip",     "binary": "unzip",      "description": "Archive extraction" },
+    { "name": "build-essential", "binary": "gcc",  "description": "C build tools (needed for some cargo installs)" },
+    { "name": "ripgrep",   "binary": "rg",         "description": "Fast grep replacement" },
+    { "name": "fzf",       "binary": "fzf",        "description": "Fuzzy finder" },
+    { "name": "jq",        "binary": "jq",         "description": "JSON processor" },
+    { "name": "duf",       "binary": "duf",        "description": "Modern df replacement" },
+    { "name": "bat",       "binary": "bat",        "description": "Syntax-highlighting cat; binary may be 'batcat' on older Ubuntu — see _binary_quirks" },
+    { "name": "fd-find",   "binary": "fdfind",     "description": "Fast find replacement; binary is 'fdfind' on Debian/Ubuntu — see _binary_quirks" },
+    { "name": "eza",       "binary": "eza",        "description": "Modern ls replacement; Ubuntu 23.10+, see _binary_quirks for older distros" },
+    { "name": "zoxide",    "binary": "zoxide",     "description": "Frecency-based cd; Ubuntu 22.10+, see _binary_quirks for fallback script" }
+  ],
+
+  "script_installs": [
+    {
+      "name": "starship",
+      "binary": "starship",
+      "description": "Cross-shell prompt (used in WSL bash/zsh)",
+      "install_cmd": "curl -sS https://starship.rs/install.sh | sh -s -- --yes"
+    },
+    {
+      "name": "zoxide_fallback",
+      "binary": "zoxide",
+      "description": "Fallback when apt version is too old",
+      "install_cmd": "curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash"
+    }
+  ],
+
+  "github_releases": [
+    {
+      "name": "delta",
+      "binary": "delta",
+      "repo": "dandavison/delta",
+      "description": "Syntax-highlighting git diff pager",
+      "asset_pattern": "delta-*-x86_64-unknown-linux-musl.tar.gz"
+    },
+    {
+      "name": "yq",
+      "binary": "yq",
+      "repo": "mikefarah/yq",
+      "description": "YAML/JSON/TOML processor (mikefarah fork)",
+      "asset_pattern": "yq_linux_amd64"
+    }
+  ]
+}
+
