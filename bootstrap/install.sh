@@ -297,41 +297,125 @@ install_yq() {
     ok "yq installed to ~/.local/bin/yq"
 }
 
-install_nerd_font() {
-    local font_dir="${HOME}/.local/share/fonts"
-    # Check if MesloLGS NF is already present
-    if find "$font_dir" -name 'MesloLGS*' -type f 2>/dev/null | grep -q .; then
-        skip "MesloLGS NF (already present in ${font_dir})"
+# Helper: download Meslo.zip from Nerd Fonts releases and install ttf files into $1.
+# $2 = "true" to run fc-cache afterward (Linux only).
+_nerd_font_download_zip() {
+    local font_dir="$1"
+    local run_fccache="$2"
+    local zip_url="https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Meslo.zip"
+
+    # Require a downloader
+    local downloader=""
+    if has curl; then
+        downloader="curl"
+    elif has wget; then
+        downloader="wget"
+    else
+        warn "Nerd Font: curl and wget are both missing — cannot download."
+        warn "  Install one then re-run, or download manually: ${zip_url}"
         return 0
     fi
-    info "Installing MesloLGS NF fonts to ${font_dir}..."
-    # NOTE: In WSL, the terminal font is set in Windows Terminal settings.json
-    # This install is primarily for native Linux GUI environments.
-    # For WSL users: set the Nerd Font in Windows Terminal → Settings → Default Profile → Font face.
-    mkdir -p "$font_dir"
-    local base_url="https://github.com/romkatv/powerlevel10k-media/raw/master"
-    local fonts=(
-        "MesloLGS NF Regular.ttf"
-        "MesloLGS NF Bold.ttf"
-        "MesloLGS NF Italic.ttf"
-        "MesloLGS NF Bold Italic.ttf"
-    )
-    local any_installed=false
-    for font in "${fonts[@]}"; do
-        local encoded_font="${font// /%20}"
-        local dest="${font_dir}/${font}"
-        if [ ! -f "$dest" ] && has curl; then
-            curl -sL "${base_url}/${encoded_font}" -o "$dest" && any_installed=true
-        fi
-    done
-    if [ "$any_installed" = true ]; then
-        # Refresh font cache on native Linux
-        has fc-cache && fc-cache -fv "$font_dir" 2>/dev/null | grep -v '^$' || true
-        ok "MesloLGS NF installed"
-        info "WSL users: set font to 'MesloLGS NF' in Windows Terminal settings."
-    else
-        warn "MesloLGS NF: could not download fonts. Install manually."
+
+    # Require unzip
+    if ! has unzip; then
+        warn "Nerd Font: unzip not found — cannot extract the font archive."
+        warn "  Install unzip and re-run, or download manually: ${zip_url}"
+        return 0
     fi
+
+    mkdir -p "$font_dir"
+    local tmp_dir
+    tmp_dir="$(mktemp -d -p "${HOME}")"
+
+    info "Downloading Meslo Nerd Font from Nerd Fonts releases..."
+    if [ "$downloader" = "curl" ]; then
+        curl -sL "$zip_url" -o "${tmp_dir}/Meslo.zip" || {
+            warn "Nerd Font: download failed. Install manually: ${zip_url}"
+            rm -rf "$tmp_dir"
+            return 0
+        }
+    else
+        wget -q "$zip_url" -O "${tmp_dir}/Meslo.zip" || {
+            warn "Nerd Font: download failed. Install manually: ${zip_url}"
+            rm -rf "$tmp_dir"
+            return 0
+        }
+    fi
+
+    info "Extracting MesloLG*.ttf files..."
+    mkdir -p "${tmp_dir}/extracted"
+    unzip -o "${tmp_dir}/Meslo.zip" 'MesloLG*.ttf' -d "${tmp_dir}/extracted" \
+        >/dev/null 2>&1 || {
+        warn "Nerd Font: unzip failed — archive may be corrupt. Install manually: ${zip_url}"
+        rm -rf "$tmp_dir"
+        return 0
+    }
+
+    local ttf_count=0
+    for ttf_file in "${tmp_dir}/extracted"/MesloLG*.ttf; do
+        [ -f "$ttf_file" ] || continue
+        cp "$ttf_file" "$font_dir/"
+        ttf_count=$((ttf_count + 1))
+    done
+
+    rm -rf "$tmp_dir"
+
+    if [ "$ttf_count" -eq 0 ]; then
+        warn "Nerd Font: no MesloLG*.ttf files found in archive. Install manually: ${zip_url}"
+        return 0
+    fi
+
+    ok "Meslo Nerd Font: ${ttf_count} file(s) installed to ${font_dir}"
+
+    if [ "$run_fccache" = "true" ]; then
+        if has fc-cache; then
+            info "Refreshing font cache..."
+            fc-cache -f "$font_dir" 2>/dev/null || true
+            ok "Font cache refreshed"
+        else
+            warn "Nerd Font: fc-cache not found — run 'fc-cache -f' after installing fontconfig."
+        fi
+    fi
+}
+
+install_nerd_font() {
+    local os_type
+    os_type="$(uname -s 2>/dev/null)" || os_type="Linux"
+
+    # ── macOS ─────────────────────────────────────────────────────────────────
+    if [ "$os_type" = "Darwin" ]; then
+        # Brew cask installs to ~/Library/Fonts; also check the system dir
+        if find "${HOME}/Library/Fonts" /Library/Fonts \
+               -name 'MesloLG*.ttf' -type f 2>/dev/null | grep -q .; then
+            skip "Meslo Nerd Font (already present in Fonts)"
+            return 0
+        fi
+        if has brew; then
+            info "Installing Meslo Nerd Font via brew cask..."
+            brew install --cask font-meslo-lg-nerd-font || {
+                warn "Nerd Font: brew cask install failed."
+                warn "  Try manually: brew install --cask font-meslo-lg-nerd-font"
+                return 0
+            }
+            ok "Meslo Nerd Font installed via brew"
+        else
+            _nerd_font_download_zip "${HOME}/Library/Fonts" false
+        fi
+        info "ACTION REQUIRED: set your terminal font face to 'MesloLGS NF'."
+        return 0
+    fi
+
+    # ── Linux / WSL ───────────────────────────────────────────────────────────
+    local font_dir="${HOME}/.local/share/fonts"
+    if find "$font_dir" -name 'MesloLG*.ttf' -type f 2>/dev/null | grep -q .; then
+        skip "Meslo Nerd Font (already present in ${font_dir})"
+        return 0
+    fi
+    info "Installing Meslo Nerd Font to ${font_dir}..."
+    _nerd_font_download_zip "$font_dir" true
+    info "ACTION REQUIRED: set your terminal font face to 'MesloLGS NF'."
+    info "  WSL / Windows Terminal → Settings → Profile → Appearance → Font face → 'MesloLGS NF'"
+    info "  Linux GUI terminal    → Preferences → Font → 'MesloLGS NF'"
 }
 
 configure_git_delta() {
@@ -441,6 +525,7 @@ main() {
     info "═══════════════════════════════════════════════"
     ok " Bootstrap complete!"
     info " Open a new terminal (or run: source ~/.bashrc)"
+    info " Font tip: set terminal font face to 'MesloLGS NF'"
     info "═══════════════════════════════════════════════"
     echo ""
 }

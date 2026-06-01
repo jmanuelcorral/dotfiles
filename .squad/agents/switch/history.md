@@ -35,3 +35,14 @@
 - For integration testing of stub writing, override `$PROFILE` in a wrapper scriptblock that dot-sources the installer — this avoids touching the real profile.
 - Idempotency was verified by running the installer twice and confirming "already present" messages on second run.
 
+### 2026-06-01 — Bilingual README + Robust Nerd Font Installer
+
+**Files changed:**
+- `README.md` — full rewrite: bilingual (English + Spanish) with language nav, Requirements/font section, corrected one-liner URLs (`jmanuelcorral` + `master`), What You Get, dotfiles register workflow, repo structure tree, Credits/Sources.
+- `bootstrap/install.ps1` — replaced minimal oh-my-posh-only font step with idempotent block: checks `%LOCALAPPDATA%\Microsoft\Windows\Fonts` and `C:\Windows\Fonts` for existing Meslo files; tries `oh-my-posh font install Meslo` first (checks exit code), falls back to `scoop bucket add nerd-fonts` + `scoop install Meslo-NF`; both wrapped in try/catch so failure warns and never aborts; corrected font name from `MesloLGM` to `MesloLGS NF` throughout.
+
+**Key decisions:**
+- Font idempotency via filesystem glob (`*Meslo*`) against both user and system font dirs — avoids registry complexity and works regardless of install method.
+- `$fontDone` flag pattern mirrors the `$installed` flag already used in the package loop — consistent style.
+- Font reminder printed unconditionally (outside the skip block) so the user always sees the "set your font" message even on re-runs.
+

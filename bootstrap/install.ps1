@@ -120,16 +120,63 @@ if (-not $NoPackages) {
         }
     }
 
-    # ── Nerd Font via oh-my-posh ──────────────────────────────────────────────
+    # ── Nerd Font (Meslo) ─────────────────────────────────────────────────────
     Write-Header "Nerd Font (Meslo)"
-    if (Get-Command oh-my-posh -ErrorAction SilentlyContinue) {
-        Write-Step "oh-my-posh font install Meslo"
-        oh-my-posh font install Meslo 2>&1 | Out-Null
-        Write-Ok "Meslo Nerd Font installed"
-        Write-Warn "Remember to set 'MesloLGM Nerd Font' in Windows Terminal → Settings → Profile → Font"
+
+    # Idempotency: check if Meslo font files already exist in user or system fonts
+    $userFontsDir   = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Fonts'
+    $systemFontsDir = 'C:\Windows\Fonts'
+    $mesloAlreadyInstalled =
+        (Get-ChildItem $userFontsDir   -Filter '*Meslo*' -ErrorAction SilentlyContinue) -or
+        (Get-ChildItem $systemFontsDir -Filter '*Meslo*' -ErrorAction SilentlyContinue)
+
+    if ($mesloAlreadyInstalled) {
+        Write-Skip "Meslo Nerd Font already installed — skipping"
     } else {
-        Write-Warn "oh-my-posh not found — skipping Nerd Font install"
+        $fontDone = $false
+
+        # Preferred: oh-my-posh font install Meslo (non-interactive)
+        if (-not $fontDone -and (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
+            try {
+                Write-Step "oh-my-posh font install Meslo"
+                oh-my-posh font install Meslo 2>&1 | Out-Null
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Ok "Meslo Nerd Font installed via oh-my-posh"
+                    $fontDone = $true
+                } else {
+                    Write-Warn "oh-my-posh font install exited $LASTEXITCODE — trying fallback"
+                }
+            } catch {
+                Write-Warn "oh-my-posh font install failed: $_"
+            }
+        }
+
+        # Fallback: scoop nerd-fonts bucket
+        if (-not $fontDone -and (Get-Command scoop -ErrorAction SilentlyContinue)) {
+            try {
+                Write-Step "scoop bucket add nerd-fonts"
+                scoop bucket add nerd-fonts 2>&1 | Out-Null
+                Write-Step "scoop install Meslo-NF"
+                scoop install Meslo-NF 2>&1 | Out-Null
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Ok "Meslo Nerd Font installed via scoop"
+                    $fontDone = $true
+                } else {
+                    Write-Warn "scoop install Meslo-NF failed (exit $LASTEXITCODE)"
+                }
+            } catch {
+                Write-Warn "scoop font install failed: $_"
+            }
+        }
+
+        if (-not $fontDone) {
+            Write-Warn "Could not install Meslo Nerd Font automatically"
+            Write-Warn "Install it manually from https://www.nerdfonts.com"
+        }
     }
+
+    Write-Warn "ACTION REQUIRED: set 'MesloLGS NF' as your terminal font after install"
+    Write-Warn "  Windows Terminal → Settings → Profile → Appearance → Font face → MesloLGS NF"
 }
 
 # ── $PROFILE stub (idempotent) ────────────────────────────────────────────────
@@ -176,7 +223,7 @@ Write-Host "  ✔  dotfiles bootstrap complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Next steps:" -ForegroundColor Cyan
 Write-Host "    1. Restart PowerShell (or run:  . `$PROFILE)"
-Write-Host "    2. If fonts were installed: set 'MesloLGM Nerd Font' in Windows Terminal → Settings → Profile → Font"
+Write-Host "    2. Set 'MesloLGS NF' as your font: Windows Terminal → Settings → Profile → Appearance → Font face"
 Write-Host "    3. Try: dotfiles help"
 Write-Host ""
 
