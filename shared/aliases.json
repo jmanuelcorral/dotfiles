@@ -1,0 +1,236 @@
+{
+  "_comment": "Cross-shell alias catalog. Trinity (PowerShell) and Tank (bash/zsh) generate native aliases from this source. Schema: { 'alias': { 'windows': '...', 'unix': '...' } }. Omit a key when the alias only applies to one OS.",
+  "_owner": "Trinity (PowerShell impl) + Tank (bash/zsh impl)",
+  "_schema_version": "1",
+
+  "aliases": {
+
+    "ls": {
+      "_note": "Modern listing — prefers eza, falls back to platform default",
+      "windows": "eza --icons --group-directories-first | Get-ChildItem",
+      "unix":    "eza --icons --group-directories-first | ls --color=auto"
+    },
+
+    "ll": {
+      "_note": "Long listing with hidden files",
+      "windows": "eza -la --icons --group-directories-first | Get-ChildItem -Force",
+      "unix":    "eza -la --icons --group-directories-first | ls -la"
+    },
+
+    "la": {
+      "_note": "List all including dotfiles (short)",
+      "windows": "eza -a --icons | Get-ChildItem -Force",
+      "unix":    "eza -a | ls -A"
+    },
+
+    "l": {
+      "_note": "Compact listing",
+      "windows": "eza --icons | Get-ChildItem",
+      "unix":    "eza --icons | ls -CF"
+    },
+
+    "lt": {
+      "_note": "Tree view (2 levels)",
+      "windows": "eza --tree --level=2 --icons | tree /F",
+      "unix":    "eza --tree --level=2 --icons | tree -L 2"
+    },
+
+    "grep": {
+      "_note": "Prefers ripgrep (rg) for speed",
+      "windows": "rg | Select-String",
+      "unix":    "rg | grep --color=auto"
+    },
+
+    "cat": {
+      "_note": "Prefers bat for syntax highlighting",
+      "windows": "bat --style=plain | Get-Content",
+      "unix":    "bat --style=plain | cat"
+    },
+
+    "find": {
+      "_note": "Prefers fd (faster, respects .gitignore)",
+      "windows": "fd | Get-ChildItem -Recurse",
+      "unix":    "fd | find"
+    },
+
+    "which": {
+      "_note": "Locate an executable in PATH",
+      "windows": "Get-Command",
+      "unix":    "which"
+    },
+
+    "touch": {
+      "_note": "Create file or update mtime",
+      "windows": "New-Item / Set-ItemProperty LastWriteTime",
+      "unix":    "touch"
+    },
+
+    "mkdir": {
+      "_note": "Create directory including parents (-p behaviour)",
+      "windows": "New-Item -ItemType Directory -Force",
+      "unix":    "mkdir -p"
+    },
+
+    "mkcd": {
+      "_note": "Make directory and cd into it",
+      "windows": "New-Item -ItemType Directory -Force; Set-Location",
+      "unix":    "mkdir -p $1 && cd $1"
+    },
+
+    "df": {
+      "_note": "Disk free / disk usage summary",
+      "windows": "Get-PSDrive",
+      "unix":    "df -h"
+    },
+
+    "du": {
+      "_note": "Directory size",
+      "windows": "Get-ChildItem -Recurse | Measure-Object -Sum Length",
+      "unix":    "du -sh"
+    },
+
+    "top": {
+      "_note": "Process viewer",
+      "windows": "Get-Process | Sort-Object CPU -Descending | Select-Object -First 20",
+      "unix":    "htop | top"
+    },
+
+    "sudo": {
+      "_note": "Elevate command — prefers gsudo on Windows",
+      "windows": "gsudo | Start-Process -Verb RunAs",
+      "unix":    "sudo"
+    },
+
+    "..": {
+      "_note": "Go up one directory",
+      "windows": "Set-Location ..",
+      "unix":    "cd .."
+    },
+
+    "...": {
+      "_note": "Go up two directories",
+      "windows": "Set-Location ../..",
+      "unix":    "cd ../.."
+    },
+
+    "....": {
+      "_note": "Go up three directories",
+      "windows": "Set-Location ../../..",
+      "unix":    "cd ../../.."
+    },
+
+    "reload": {
+      "_note": "Reload shell profile",
+      "windows": ". $PROFILE",
+      "unix":    "source ~/.bashrc | source ~/.zshrc"
+    },
+
+    "open": {
+      "_note": "Open file/URL with default application",
+      "windows": "Invoke-Item | explorer.exe",
+      "unix":    "xdg-open | open"
+    },
+
+    "explorer": {
+      "_note": "Open Windows Explorer (Windows only)",
+      "windows": "explorer.exe"
+    },
+
+    "export": {
+      "_note": "Set environment variable (Linux style)",
+      "windows": "$env:NAME = VALUE",
+      "unix":    "export NAME=VALUE"
+    },
+
+    "env": {
+      "_note": "List environment variables",
+      "windows": "Get-ChildItem Env:",
+      "unix":    "env"
+    },
+
+    "history": {
+      "_note": "Show command history",
+      "windows": "Get-History | Select-Object CommandLine",
+      "unix":    "history"
+    },
+
+    "head": {
+      "_note": "Show first N lines of file",
+      "windows": "Get-Content | Select-Object -First",
+      "unix":    "head -n"
+    },
+
+    "tail": {
+      "_note": "Show last N lines of file",
+      "windows": "Get-Content | Select-Object -Last",
+      "unix":    "tail -n"
+    },
+
+    "ps": {
+      "_note": "List running processes",
+      "windows": "Get-Process",
+      "unix":    "ps aux"
+    },
+
+    "kill": {
+      "_note": "Kill a process by name/pid",
+      "windows": "Stop-Process",
+      "unix":    "kill"
+    },
+
+    "up": {
+      "_note": "Go up N directories (function, not simple alias)",
+      "windows": "function: cd .. N times",
+      "unix":    "function: cd .. N times"
+    },
+
+    "g": {
+      "_note": "Short git alias",
+      "windows": "git",
+      "unix":    "git"
+    },
+
+    "ga": {
+      "_note": "git add",
+      "windows": "git add",
+      "unix":    "git add"
+    },
+
+    "gc": {
+      "_note": "git commit",
+      "windows": "git commit",
+      "unix":    "git commit"
+    },
+
+    "gst": {
+      "_note": "git status",
+      "windows": "git status",
+      "unix":    "git status"
+    },
+
+    "gp": {
+      "_note": "git push",
+      "windows": "git push",
+      "unix":    "git push"
+    },
+
+    "gl": {
+      "_note": "git log (pretty)",
+      "windows": "git log --oneline --graph --decorate",
+      "unix":    "git log --oneline --graph --decorate"
+    },
+
+    "gd": {
+      "_note": "git diff",
+      "windows": "git diff",
+      "unix":    "git diff"
+    },
+
+    "cdot": {
+      "_note": "cd to dotfiles root",
+      "windows": "Set-Location $env:DOTFILES",
+      "unix":    "cd $DOTFILES"
+    }
+  }
+}
+
