@@ -117,6 +117,41 @@ This document defines the authoritative structure for the dotfiles repo. Trinity
 
 ---
 
+### 7. Decision: Local AI Agent Backend Recommendation
+
+**Date:** 2026-06-02  
+**Author:** Oracle  
+**Status:** PROPOSED — awaiting implementation approval
+
+**Ollama + Phi-4-mini-instruct**
+- Install: `winget install Ollama.Ollama` (Windows) / `curl https://ollama.ai/install.sh | sh` (WSL)
+- Model pull: `ollama pull phi4-mini` (~2.3 GB, MIT license)
+- Invocation: OpenAI-compatible REST at `localhost:11434/v1/chat/completions`
+- Fallback: Qwen2.5-Coder-1.5B (~1.0 GB, Apache 2.0) via `$env:DOTFILES_AGENT_MODEL`
+- Offline-first: `dotfiles explain <alias>` works without model via `shared/aliases.json`
+
+Full research: `docs/research/local-agent-2026.md`
+
+---
+
+### 8. Decision: Local Agent Architecture Plan (6-Phase Implementation)
+
+**Date:** 2026-06-02  
+**Author:** Morpheus  
+**Status:** PROPOSED — awaiting Jose's approval before implementation
+
+Architectural plan for `dotfiles agent "<query>"` and `dotfiles explain <cmd>`:
+- **Phase 1 (Switch):** Shared agent assets + offline explain
+- **Phase 2 (Trinity):** PowerShell agent wrapper
+- **Phase 3 (Tank):** bash/zsh agent parity
+- **Phase 4 (Switch):** Installer + docs updates
+- **Phase 5 (Trinity/Tank):** AI-enhanced explain
+- **Phase 6 (Oracle):** Benchmarking
+
+Full plan: `docs/plans/local-agent-plan.md`
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus

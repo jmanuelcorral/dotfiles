@@ -37,3 +37,7 @@
 - Every external tool uses `Get-Command X -ErrorAction SilentlyContinue` before use.
 - Profile is safe on a fresh machine with nothing installed.
 
+### 2026-06-02 — Upcoming: Local AI Agent Feature
+
+**Context:** Oracle has researched local SLM backends (recommending Ollama + Phi-4-mini-instruct), and Morpheus has architected a 6-phase implementation plan. Once Jose approves, Trinity will own Phase 2 (PowerShell agent wrapper). The `dotfiles agent "<query>"` command will allow users to ask questions about aliases/tools with AI assistance, and `dotfiles explain <cmd>` will enhance command documentation. Trinity's responsibilities in Phase 2 will include PowerShell bindings to the Ollama localhost:11434 REST API and graceful degradation when the model is unavailable.
+

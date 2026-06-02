@@ -61,3 +61,7 @@
 - Piped-iex simulation for testing (`& { $(Get-Content … -Raw) } -NoPackages`) actually executes side effects on the real machine. For safe testing, patch the git-check to an always-true condition to confirm the error branch fires, rather than letting it clone.
 - The `$env:DOTFILES` override for the clone destination makes the one-liner idempotent for users who have already set a custom dotfiles location.
 
+### 2026-06-02 — Upcoming: Local AI Agent Feature
+
+**Context:** Oracle has researched local SLM backends (recommending Ollama + Phi-4-mini-instruct), and Morpheus has architected a 6-phase implementation plan. Once Jose approves, Switch will own Phase 1 (shared agent assets + offline explain) and Phase 4 (installer updates + docs). Phase 1 will involve creating `shared/agent/` directory with prompt templates and the offline-first `dotfiles explain` implementation that reads `shared/aliases.json` and `shared/tools.json` directly. Phase 4 will update bootstrap installers to optionally install Ollama (via `-IncludeAgent` flag) and refresh documentation. Feature parity across shells is ensured in later phases by Trinity (Phase 2) and Tank (Phase 3).
+

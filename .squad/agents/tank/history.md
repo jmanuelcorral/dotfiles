@@ -51,3 +51,7 @@
 - **Glob-based copy instead of process substitution**: `for ttf_file in "${tmp_dir}/extracted"/MesloLG*.ttf` with `[ -f "$ttf_file" ] || continue` avoids the `set -e` + process-substitution exit-code hazard that `while read < <(find ...)` can trigger.
 - **Clear final message**: `install_nerd_font` always emits an ACTION REQUIRED line after a successful install; the bootstrap banner's closing block also carries a brief font-tip reminder.
 - **No WSL bash available**: syntax validated with Git Bash 5.3 (`bash -n bootstrap/install.sh` → exit 0).
+
+### 2026-06-02 — Upcoming: Local AI Agent Feature
+
+**Context:** Oracle has researched local SLM backends (recommending Ollama + Phi-4-mini-instruct), and Morpheus has architected a 6-phase implementation plan. Once Jose approves, Tank will own Phase 3 (bash/zsh agent parity). The `dotfiles agent "<query>"` command will allow users to ask questions about aliases/tools with AI assistance, and `dotfiles explain <cmd>` will enhance command documentation. Tank's responsibilities in Phase 3 will include bash/zsh bindings to the Ollama localhost:11434 REST API and graceful degradation when the model is unavailable — ensuring feature parity with PowerShell.
