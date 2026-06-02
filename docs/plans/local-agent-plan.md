@@ -451,13 +451,25 @@ Override with `$env:OLLAMA_MODELS` if user wants a different drive.
 
 ---
 
+## Selected defaults (chosen autonomously, pending Jose's confirmation)
+
+Jose was unavailable when the plan was delivered and asked the team to proceed with good judgment. To keep the proposal ready-to-start, the Coordinator locks in the following defaults (all matching Morpheus's recommendations). Jose can override any of these before implementation begins:
+
+| Open question | Selected default |
+|---------------|------------------|
+| Q1 — Ollama install | **Opt-in** installer flag (`-IncludeAgent` / `--include-agent`); never auto-install |
+| Q2 — Default model | **Phi-4-mini** (Qwen2.5-Coder-1.5B documented as the low-RAM alternative) |
+| Q3 — Remote fallback | **Strictly local** for now (endpoint override deferred to a later phase) |
+| Q4 — `explain` AI | **Offline-first by default**, AI examples behind an explicit `-Ai` flag |
+| Q5 — Subcommand shape | **Top-level** `dotfiles agent` and `dotfiles explain` |
+
 ## Awaiting Approval
 
-This plan requires Jose's sign-off before implementation begins.
+This plan requires Jose's sign-off before implementation begins. **No code has been written yet** — only the research brief and this plan.
 
-**To approve:** Review the phased plan (§9) and open questions (§10), then confirm the answers.
+**To approve:** Review the phased plan (§9) and open questions (§10). If the selected defaults above are acceptable, just say "go" and Switch starts Phase 1; otherwise tell us which defaults to change.
 
-**Next step after approval:** Switch begins Phase 1 (shared assets + offline explain).
+**Next step after approval:** Switch begins Phase 1 (shared assets + offline `explain`).
 
 ---
 
