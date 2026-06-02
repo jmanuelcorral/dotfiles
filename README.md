@@ -31,6 +31,8 @@ Clone once. Install once. Sync everywhere.
 
 ### Quick Install
 
+> **Prerequisite:** Git must be installed and on your PATH before running the one-liner — it is the only dependency the installer cannot self-install. [Download Git](https://git-scm.com/download/win).
+
 #### Windows (PowerShell 7+)
 
 ```powershell
@@ -179,6 +181,8 @@ Clona una vez. Instala una vez. Sincroniza en cualquier máquina.
 ---
 
 ### Instalación rápida
+
+> **Prerequisito:** Git debe estar instalado y en el PATH antes de ejecutar el comando — es la única dependencia que el instalador no puede instalar por sí mismo. [Descargar Git](https://git-scm.com/download/win).
 
 #### Windows (PowerShell 7+)
 

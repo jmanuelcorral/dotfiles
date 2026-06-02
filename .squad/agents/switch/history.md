@@ -46,3 +46,18 @@
 - `$fontDone` flag pattern mirrors the `$installed` flag already used in the package loop — consistent style.
 - Font reminder printed unconditionally (outside the skip block) so the user always sees the "set your font" message even on re-runs.
 
+### 2026-06-02 — Self-Bootstrap for `irm … | iex` one-liner
+
+**Bug fixed:** `bootstrap/install.ps1` line 32 (`$RepoRoot = Split-Path $PSScriptRoot -Parent`) crashed when the script was piped via `irm … | iex` because `$PSScriptRoot` is empty in that context — no file on disk.
+
+**Files changed:**
+- `bootstrap/install.ps1` — added self-bootstrap block (lines 30–79) between colour helpers and `$RepoRoot` assignment. Detects empty `$PSScriptRoot`, checks for `git`, chooses clone target (`$env:DOTFILES` or `$HOME\dotfiles`), clones or pulls, re-invokes the on-disk installer with `@PSBoundParameters`, then `return`s. Normal on-disk execution is 100% unchanged.
+- `README.md` — added "**Prerequisite:** Git must be installed…" callout to both English and Spanish Quick Install sections.
+
+**Key learnings:**
+- Place the self-bootstrap block *after* colour helpers so `Write-Header`/`Write-Step`/`Write-Ok`/`Write-Warn` are available inside the bootstrap path — same UX as the rest of the script.
+- `[string]::IsNullOrEmpty($PSScriptRoot)` is the correct guard; `$PSScriptRoot` is `[string]` so `-not $PSScriptRoot` also works, but the explicit method is clearer.
+- `@PSBoundParameters` transparently forwards named switches (`-NoPackages`, etc.) to the re-invoked on-disk script — no manual parameter forwarding needed.
+- Piped-iex simulation for testing (`& { $(Get-Content … -Raw) } -NoPackages`) actually executes side effects on the real machine. For safe testing, patch the git-check to an always-true condition to confirm the error branch fires, rather than letting it clone.
+- The `$env:DOTFILES` override for the clone destination makes the one-liner idempotent for users who have already set a custom dotfiles location.
+

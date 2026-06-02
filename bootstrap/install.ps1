@@ -27,6 +27,57 @@ function Write-Ok     { param($msg) Write-Host "  ✓ $msg"   -ForegroundColor G
 function Write-Skip   { param($msg) Write-Host "  · $msg"   -ForegroundColor DarkGray }
 function Write-Warn   { param($msg) Write-Host "  ⚠ $msg"   -ForegroundColor Yellow }
 
+# ── Self-bootstrap (piped / iex mode) ─────────────────────────────────────────
+# When piped via `irm ... | iex`, $PSScriptRoot is empty — there is no backing
+# file on disk. In that case: clone (or update) the repo, then re-invoke the
+# on-disk installer so all subsequent paths resolve correctly.
+if ([string]::IsNullOrEmpty($PSScriptRoot)) {
+    Write-Header "Self-Bootstrap  (irm | iex mode)"
+
+    # Git is the ONLY prerequisite we cannot self-install
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        Write-Host ""
+        Write-Host "  ✗ Git is required but was not found on PATH." -ForegroundColor Red
+        Write-Host "    Install Git first:  https://git-scm.com/download/win" -ForegroundColor Red
+        Write-Host "    Then re-run the one-liner." -ForegroundColor Red
+        Write-Host ""
+        exit 1
+    }
+
+    # Choose clone destination: honour $env:DOTFILES if set, else $HOME\dotfiles
+    $cloneTarget = if (-not [string]::IsNullOrEmpty($env:DOTFILES)) {
+        $env:DOTFILES
+    } else {
+        Join-Path $HOME 'dotfiles'
+    }
+
+    $repoUrl = 'https://github.com/jmanuelcorral/dotfiles.git'
+
+    if ((Test-Path $cloneTarget) -and (Test-Path (Join-Path $cloneTarget '.git'))) {
+        Write-Step "Repo already exists at $cloneTarget — running git pull --ff-only"
+        git -C $cloneTarget pull --ff-only
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warn "git pull failed (exit $LASTEXITCODE) — continuing with existing clone"
+        } else {
+            Write-Ok "Repo up to date"
+        }
+    } else {
+        Write-Step "Cloning $repoUrl  →  $cloneTarget"
+        git clone $repoUrl $cloneTarget
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  ✗ git clone failed — cannot continue." -ForegroundColor Red
+            exit 1
+        }
+        Write-Ok "Cloned to $cloneTarget"
+    }
+
+    # Re-invoke the on-disk script; pass through any switches (e.g. -NoPackages)
+    Write-Step "Re-invoking on-disk installer…"
+    $onDiskScript = Join-Path $cloneTarget 'bootstrap\install.ps1'
+    & $onDiskScript @PSBoundParameters
+    return
+}
+
 # ── Repo root (works from any clone path) ────────────────────────────────────
 # bootstrap/install.ps1 lives one level below the repo root.
 $RepoRoot        = Split-Path $PSScriptRoot -Parent

@@ -31,6 +31,16 @@
 - **Arch detection for delta**: delta's release assets use different libc suffixes per arch: x86_64 uses `musl` (statically linked, distro-agnostic), aarch64 uses `gnu`, and armv7 uses `gnueabihf`. Hardcoding `x86_64` silently installs a broken binary on ARM hosts. Pattern: set a `delta_target` variable via `case "$(uname -m)"` covering `aarch64|arm64`, `armv7l|arm`, and default x86_64, then interpolate into the full target triple in the URL.
 - **curl | bash failure isolation**: `curl ... | bash` and `curl ... | sh` as standalone statements abort the whole installer on network failure. Append `|| { warn "..."; return 0; }` so optional tool installs degrade gracefully and the critical shell-wiring steps (write_stub calls) always execute.
 
+### 2026-06-02 — Self-bootstrap block for curl | bash one-liner
+
+- **Root cause of piped-exec bug**: When run via `curl ... | bash`, `BASH_SOURCE[0]` is empty/`"bash"` and `dirname ""` yields `.`, so `SCRIPT_DIR` becomes CWD and `DOTFILES` becomes CWD's parent — both wrong. The repo was never cloned.
+- **Fix location**: Helpers (`info`/`ok`/`skip`/`warn`/`err`/`has`) moved UP before `SCRIPT_DIR` so they're available inside the bootstrap block. New self-bootstrap block inserted between helpers and the `SCRIPT_DIR` computation.
+- **Detection condition**: `[ -z "$_bs_src" ] || [ "$_bs_src" = "bash" ] || [ "$_bs_src" = "sh" ] || [ ! -f "$_bs_src" ]` — covers empty, interpreter-named, and non-file cases.
+- **`exec` pattern**: `exec bash "$target/bootstrap/install.sh" "$@"` replaces the bootstrap process; the piped stream is never re-read after exec, so no double-execution risk.
+- **`set -euo pipefail` safety**: `git pull || warn "..."` (non-critical), `git clone || { err; exit 1; }` (critical). `${BASH_SOURCE[0]:-}` prevents `set -u` abort. `${DOTFILES:-${HOME}/dotfiles}` safe default.
+- **`unset _bs_src _bs_target`**: Runs only in on-disk mode (bootstrap mode exec'd away), keeps the script's variable namespace clean.
+- **Verification**: `bash -n bootstrap/install.sh` → exit 0. Piped simulation with fake-git stub confirmed both branches: pull path (existing repo) and clone path (fresh install). On-disk mode re-exec'd and ran fully with `--no-packages`.
+
 ### 2026-06-01 — Nerd Font installation: official release zip + macOS brew path
 
 - **Source changed to official Nerd Fonts releases**: Previous `install_nerd_font` downloaded individual `MesloLGS NF *.ttf` files from `romkatv/powerlevel10k-media` which hard-coded 4 file URLs and had no macOS support. Replaced with `https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Meslo.zip` which is the canonical distribtion point and survives font renames.

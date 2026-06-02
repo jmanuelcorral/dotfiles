@@ -27,10 +27,6 @@ for arg in "$@"; do
     esac
 done
 
-# ── Resolve DOTFILES root from this script's location ────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export DOTFILES="$(cd "${SCRIPT_DIR}/.." && pwd)"
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 info()    { printf '\e[34m[dotfiles]\e[0m %s\n' "$*"; }
 ok()      { printf '\e[32m[  ok   ]\e[0m %s\n' "$*"; }
@@ -39,6 +35,40 @@ warn()    { printf '\e[33m[ warn  ]\e[0m %s\n' "$*"; }
 err()     { printf '\e[31m[ error ]\e[0m %s\n' "$*" >&2; }
 
 has() { command -v "$1" >/dev/null 2>&1; }
+
+# ── Self-bootstrap (curl | bash mode) ────────────────────────────────────────
+# When piped via `curl ... | bash`, BASH_SOURCE[0] is not a real file on disk.
+# Detect this, clone/update the repo, then exec the on-disk installer so the
+# rest of this script runs from a proper path (SCRIPT_DIR/DOTFILES are valid).
+_bs_src="${BASH_SOURCE[0]:-}"
+if [ -z "$_bs_src" ] || [ "$_bs_src" = "bash" ] || [ "$_bs_src" = "sh" ] \
+    || [ ! -f "$_bs_src" ]; then
+    info "Running in piped/bootstrap mode — cloning repo first."
+    if ! has git; then
+        err "git is required but not installed. Please install git and re-run."
+        exit 1
+    fi
+    _bs_target="${DOTFILES:-${HOME}/dotfiles}"
+    if [ -d "${_bs_target}/.git" ]; then
+        info "Repo already exists at ${_bs_target}; pulling latest..."
+        git -C "${_bs_target}" pull --ff-only || \
+            warn "git pull failed; continuing with existing checkout."
+    else
+        info "Cloning dotfiles to ${_bs_target}..."
+        git clone https://github.com/jmanuelcorral/dotfiles.git "${_bs_target}" || {
+            err "git clone failed. Check your network connection and try again."
+            exit 1
+        }
+        ok "Cloned to ${_bs_target}"
+    fi
+    info "Re-launching on-disk installer..."
+    exec bash "${_bs_target}/bootstrap/install.sh" "$@"
+fi
+unset _bs_src _bs_target
+
+# ── Resolve DOTFILES root from this script's location ────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export DOTFILES="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # ── Detect package manager ────────────────────────────────────────────────────
 detect_pkg_manager() {
