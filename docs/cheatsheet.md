@@ -135,11 +135,11 @@ Run `dotfiles help <keyword>` to filter, or just `dotfiles help` for interactive
 | `dotfiles help <query>` | Filter cheatsheet by keyword |
 | `dotfiles register <name>` | Register a script in bin/ |
 | `dotfiles list` | List registered tools |
-| `dotfiles update` | git pull + reload profile |
+| `dotfiles version` | Show VERSION and git commit |
+| `dotfiles update` | Fast-forward pull + version report + bootstrap rerun |
 | `dotfiles edit` | Open dotfiles repo in editor |
 
 ---
 
 > **Tip:** Run `dotfiles help git` to see only git commands.
 > **Tip:** Run `dotfiles register gituseswitch -Description "Switch git user"` to register your own tools.
-

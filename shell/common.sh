@@ -181,13 +181,36 @@ fi
 # delta is configured in ~/.gitconfig; nothing extra needed here.
 
 # ── dotfiles CLI helper ───────────────────────────────────────────────────────
-# Provides: dotfiles help [query] | dotfiles list | dotfiles update | dotfiles edit
+# Provides: dotfiles help [query] | dotfiles list | dotfiles version | dotfiles update | dotfiles edit
 #           dotfiles explain <alias-or-tool> | dotfiles agent --setup [--fallback]
 # Reads shared/tools.json, shared/aliases.json, and docs/cheatsheet.md.
 # Uses fzf for interactive search when available, plain grep otherwise.
 dotfiles() {
     local cmd="${1:-help}"
     shift 2>/dev/null || true
+
+    _dotfiles_version() {
+        if [ -f "${DOTFILES}/VERSION" ]; then
+            sed -n '1{s/[[:space:]]//g;p;q;}' "${DOTFILES}/VERSION"
+        else
+            printf '%s\n' "0.0.0"
+        fi
+    }
+
+    _dotfiles_git_sha() {
+        git -C "${DOTFILES}" rev-parse --short HEAD 2>/dev/null || true
+    }
+
+    _dotfiles_changelog_section() {
+        local version="$1"
+        local changelog="${DOTFILES}/CHANGELOG.md"
+        [ -f "$changelog" ] || return 0
+        awk -v version="$version" '
+            $0 ~ "^## \\[?" version "\\]?([[:space:]]+-.*)?$" { found=1; next }
+            found && /^##[[:space:]]/ { exit }
+            found { print }
+        ' "$changelog"
+    }
 
     case "$cmd" in
         help)
@@ -233,9 +256,48 @@ dotfiles() {
                     | sed 's/"name"[[:space:]]*:[[:space:]]*//;s/"//g'
             fi
             ;;
+        version)
+            local version sha
+            version="$(_dotfiles_version)"
+            sha="$(_dotfiles_git_sha)"
+            if [ -n "$sha" ]; then
+                echo "dotfiles v${version} (${sha})"
+            else
+                echo "dotfiles v${version}"
+            fi
+            ;;
         update)
-            echo "Updating dotfiles..."
-            ( cd "${DOTFILES}" && git pull --rebase ) || return 1
+            local old_version new_version changes installer
+            old_version="$(_dotfiles_version)"
+            echo "Pulling latest dotfiles from origin..."
+            (
+                cd "${DOTFILES}" || exit 1
+                branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+                if [ -n "$branch" ] && [ "$branch" != "HEAD" ]; then
+                    git pull --ff-only origin "$branch"
+                else
+                    git pull --ff-only
+                fi
+            ) || return 1
+            new_version="$(_dotfiles_version)"
+            if [ "$old_version" = "$new_version" ]; then
+                echo "dotfiles: v${new_version} (already up to date)"
+            else
+                echo "dotfiles: v${old_version} → v${new_version}"
+                changes="$(_dotfiles_changelog_section "$new_version")"
+                if [ -n "$changes" ]; then
+                    echo ""
+                    echo "Changelog for v${new_version}"
+                    printf '%s\n' "$changes"
+                fi
+            fi
+            installer="${DOTFILES}/bootstrap/install.sh"
+            if [ -x "$installer" ] || [ -f "$installer" ]; then
+                echo "Re-running installer to apply updates..."
+                bash "$installer"
+            else
+                echo "dotfiles: installer not found at $installer; reloading shell only." >&2
+            fi
             echo "Reloading shell..."
             reload
             ;;
@@ -358,9 +420,8 @@ dotfiles() {
             echo "  dotfiles agent \"<query>\" --run     Generate and optionally execute"
             ;;
         *)
-            echo "Usage: dotfiles <help|list|update|edit|explain|agent> [args]" >&2
+            echo "Usage: dotfiles <help|list|version|update|edit|explain|agent> [args]" >&2
             return 1
             ;;
     esac
 }
-

@@ -82,3 +82,23 @@
 - `Unblock-File` applied to all extracted files on Windows (removes Zone.Identifier = 3 SmartScreen mark).
 - Inference logic (prompt build + subprocess + post-process) NOT implemented — Trinity owns Phase 3 (PS), Tank owns Phase 4 (bash). Clearly marked placeholders left in both modules.
 
+### 2026-06-02 — Dotfiles Versioning + Version-Aware Update
+
+**Design chosen:**
+- Root `VERSION` is the single source of truth; initial version is `1.0.0`.
+- Root `CHANGELOG.md` uses Keep a Changelog-style SemVer sections.
+- `dotfiles version` exists in both `bin/dotfiles.ps1` and `shell/common.sh`, reading `VERSION` and appending the short git SHA when available.
+- `dotfiles update` captures old/new versions around `git pull --ff-only`, reports `dotfiles: vOLD → vNEW` or already up to date, prints the new changelog section when present, and reruns the platform installer idempotently.
+
+**Files touched:**
+- `VERSION`, `CHANGELOG.md`
+- `bin/dotfiles.ps1`, `shell/common.sh`
+- `bootstrap/install.ps1`, `bootstrap/install.sh`
+- `README.md`, `docs/cheatsheet.md`
+- `.squad/decisions/inbox/switch-versioning.md`
+- `.squad/skills/dotfiles-versioning/SKILL.md`
+
+**Gotchas:**
+- Keep the version out of shell constants; always read from `VERSION`.
+- Use `git pull --ff-only` for update, not rebase, to make the version transition deterministic and avoid unexpected history rewrites.
+- Full installer rerun is intentional because install scripts are idempotent and bootstrap/package registration may change between versions.

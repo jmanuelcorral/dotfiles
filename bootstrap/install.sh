@@ -69,6 +69,10 @@ unset _bs_src _bs_target
 # ── Resolve DOTFILES root from this script's location ────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export DOTFILES="$(cd "${SCRIPT_DIR}/.." && pwd)"
+DOTFILES_VERSION="0.0.0"
+if [ -f "${DOTFILES}/VERSION" ]; then
+    DOTFILES_VERSION="$(sed -n '1{s/[[:space:]]//g;p;q;}' "${DOTFILES}/VERSION")"
+fi
 
 # ── Detect package manager ────────────────────────────────────────────────────
 detect_pkg_manager() {
@@ -496,7 +500,7 @@ EOF
 main() {
     echo ""
     info "═══════════════════════════════════════════════"
-    info " dotfiles bootstrap — Unix/WSL installer"
+    info " dotfiles bootstrap v${DOTFILES_VERSION} — Unix/WSL installer"
     info " Repo: ${DOTFILES}"
     info "═══════════════════════════════════════════════"
     echo ""
@@ -561,4 +565,3 @@ main() {
 }
 
 main "$@"
-

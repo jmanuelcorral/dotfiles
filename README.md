@@ -71,7 +71,7 @@ git clone https://github.com/jmanuelcorral/dotfiles.git ~/dotfiles
 | **PSReadLine tuned** | History search, syntax highlighting, better keybindings |
 | **Tab completions** | For `git`, `gh`, `winget`, `scoop`, and more |
 | **WSL bash/zsh parity** | Shared aliases and config for bash & zsh |
-| **`dotfiles` CLI helper** | `dotfiles help|list|register|update|edit` |
+| **`dotfiles` CLI helper** | `dotfiles help|list|version|register|update|edit` |
 | **Extensible** | Register your own scripts in one command |
 | **Idempotent** | Safe to re-run — skips what's already installed |
 
@@ -99,6 +99,18 @@ Registered tools survive re-installs and are listed by `dotfiles list`.
 ### Re-installing / Updating
 
 The install scripts are **idempotent** — safe to re-run at any time:
+
+Check the installed dotfiles version:
+
+```powershell
+dotfiles version
+```
+
+Update with a fast-forward pull, version report, changelog snippet, and idempotent bootstrap re-run:
+
+```powershell
+dotfiles update
+```
 
 ```powershell
 # Windows
@@ -222,7 +234,7 @@ git clone https://github.com/jmanuelcorral/dotfiles.git ~/dotfiles
 | **PSReadLine optimizado** | Búsqueda en historial, resaltado de sintaxis, atajos mejorados |
 | **Completado con Tab** | Para `git`, `gh`, `winget`, `scoop` y más |
 | **Paridad bash/zsh en WSL** | Alias y config compartidos para bash y zsh |
-| **Herramienta CLI `dotfiles`** | `dotfiles help|list|register|update|edit` |
+| **Herramienta CLI `dotfiles`** | `dotfiles help|list|version|register|update|edit` |
 | **Extensible** | Registra tus propios scripts con un solo comando |
 | **Idempotente** | Seguro para volver a ejecutar — omite lo que ya está instalado |
 
@@ -250,6 +262,18 @@ Las herramientas registradas sobreviven a las reinstalaciones y se listan con `d
 ### Reinstalar / Actualizar
 
 Los scripts de instalación son **idempotentes** — seguros para volver a ejecutar en cualquier momento:
+
+Comprueba la versión instalada de dotfiles:
+
+```powershell
+dotfiles version
+```
+
+Actualiza con fast-forward pull, reporte de versión, extracto del changelog y reinstalación idempotente:
+
+```powershell
+dotfiles update
+```
 
 ```powershell
 # Windows

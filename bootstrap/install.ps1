@@ -82,9 +82,11 @@ if ([string]::IsNullOrEmpty($PSScriptRoot)) {
 # bootstrap/install.ps1 lives one level below the repo root.
 $RepoRoot        = Split-Path $PSScriptRoot -Parent
 $env:DOTFILES    = $RepoRoot
+$VersionFile     = Join-Path $RepoRoot 'VERSION'
+$DotfilesVersion = if (Test-Path $VersionFile) { (Get-Content $VersionFile -TotalCount 1).Trim() } else { '0.0.0' }
 
 Write-Host ""
-Write-Host "  dotfiles installer" -ForegroundColor Magenta
+Write-Host "  dotfiles installer v$DotfilesVersion" -ForegroundColor Magenta
 Write-Host "  Repo root : $RepoRoot"
 Write-Host "  Profile   : $PROFILE"
 Write-Host ""
@@ -277,4 +279,3 @@ Write-Host "    1. Restart PowerShell (or run:  . `$PROFILE)"
 Write-Host "    2. Set 'MesloLGS NF' as your font: Windows Terminal → Settings → Profile → Appearance → Font face"
 Write-Host "    3. Try: dotfiles help"
 Write-Host ""
-

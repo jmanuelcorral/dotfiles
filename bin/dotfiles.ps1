@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    dotfiles CLI — manage your dotfiles, tools, aliases, and local AI agent.
+    dotfiles CLI — manage your versioned dotfiles, tools, aliases, and local AI agent.
 .DESCRIPTION
     Subcommands:
         help    [query]            Show the command cheatsheet + registered tools.
@@ -8,9 +8,11 @@
                                    for interactive fuzzy search; otherwise prints
                                    all entries. With a query, filters to matching lines.
         list                       List all tools registered in shared/tools.json.
+        version                    Show the current VERSION and git commit.
         register <name>            Register (or update) a script in bin/ into
                                    shared/tools.json. Use -Description to describe it.
-        update                     git pull inside $env:DOTFILES and reload $PROFILE.
+        update                     Fast-forward pull, report version changes, rerun install,
+                                   and reload $PROFILE.
         edit                       Open the dotfiles repo in $EDITOR / VS Code / notepad.
         explain <alias-or-tool>    Show the definition and both-shell forms of an alias
                                    or registered tool — fully offline, no model needed.
@@ -33,6 +35,7 @@
     dotfiles explain gst
     dotfiles register gituseswitch -Description "Switch git user identity"
     dotfiles list
+    dotfiles version
     dotfiles update
     dotfiles edit
     dotfiles agent --setup
@@ -53,6 +56,8 @@ $DotfilesRoot = if ($env:DOTFILES) { $env:DOTFILES } else { Split-Path $PSScript
 $ToolsJson    = Join-Path $DotfilesRoot 'shared\tools.json'
 $AliasesJson  = Join-Path $DotfilesRoot 'shared\aliases.json'
 $Cheatsheet   = Join-Path $DotfilesRoot 'docs\cheatsheet.md'
+$VersionFile  = Join-Path $DotfilesRoot 'VERSION'
+$Changelog    = Join-Path $DotfilesRoot 'CHANGELOG.md'
 
 # ── Data helpers ──────────────────────────────────────────────────────────────
 
@@ -69,6 +74,56 @@ function Get-ToolsData {
 
 function Save-ToolsData([object]$data) {
     $data | ConvertTo-Json -Depth 5 | Set-Content $ToolsJson -Encoding UTF8
+}
+
+function Get-DotfilesVersion {
+    if (Test-Path $VersionFile) {
+        $version = (Get-Content $VersionFile -TotalCount 1).Trim()
+        if ($version) { return $version }
+    }
+    '0.0.0'
+}
+
+function Get-DotfilesGitSha {
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) { return '' }
+
+    Push-Location $DotfilesRoot
+    try {
+        $sha = git rev-parse --short HEAD 2>$null
+        if ($LASTEXITCODE -eq 0 -and $sha) { return $sha.Trim() }
+    } finally {
+        Pop-Location
+    }
+    ''
+}
+
+function Write-ChangelogSection {
+    param([string]$Version)
+
+    if (-not (Test-Path $Changelog)) { return }
+
+    $lines = Get-Content $Changelog
+    $pattern = '^\#\#\s+\[?' + [regex]::Escape($Version) + '\]?(\s+-\s+.*)?$'
+    $start = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match $pattern) {
+            $start = $i
+            break
+        }
+    }
+    if ($start -lt 0) { return }
+
+    $section = [System.Collections.Generic.List[string]]::new()
+    for ($i = $start; $i -lt $lines.Count; $i++) {
+        if ($i -gt $start -and $lines[$i] -match '^##\s+') { break }
+        $section.Add($lines[$i])
+    }
+
+    if ($section.Count -gt 0) {
+        Write-Host ""
+        Write-Host "Changelog for v$Version" -ForegroundColor Cyan
+        $section | Select-Object -Skip 1 | ForEach-Object { Write-Host $_ }
+    }
 }
 
 # ── HELP ─────────────────────────────────────────────────────────────────────
@@ -151,6 +206,18 @@ function Invoke-List {
     Write-Host ""
 }
 
+# ── VERSION ──────────────────────────────────────────────────────────────────
+
+function Invoke-Version {
+    $version = Get-DotfilesVersion
+    $sha = Get-DotfilesGitSha
+    if ($sha) {
+        Write-Host "dotfiles v$version ($sha)"
+    } else {
+        Write-Host "dotfiles v$version"
+    }
+}
+
 # ── REGISTER ─────────────────────────────────────────────────────────────────
 
 function Invoke-Register {
@@ -195,16 +262,45 @@ function Invoke-Register {
 # ── UPDATE ────────────────────────────────────────────────────────────────────
 
 function Invoke-Update {
+    $oldVersion = Get-DotfilesVersion
+
     Write-Host "Pulling latest dotfiles from origin..." -ForegroundColor Cyan
     Push-Location $DotfilesRoot
     try {
-        git --no-pager pull --ff-only
-        Write-Host "Reloading `$PROFILE..." -ForegroundColor Cyan
-        . $PROFILE
-        Write-Host "Done." -ForegroundColor Green
+        $branch = git rev-parse --abbrev-ref HEAD 2>$null
+        if ($LASTEXITCODE -eq 0 -and $branch -and $branch.Trim() -ne 'HEAD') {
+            git --no-pager pull --ff-only origin $branch.Trim()
+        } else {
+            git --no-pager pull --ff-only
+        }
+        if ($LASTEXITCODE -ne 0) {
+            throw "git pull --ff-only failed with exit code $LASTEXITCODE"
+        }
     } finally {
         Pop-Location
     }
+
+    $newVersion = Get-DotfilesVersion
+    if ($oldVersion -eq $newVersion) {
+        Write-Host "dotfiles: v$newVersion (already up to date)" -ForegroundColor Green
+    } else {
+        Write-Host "dotfiles: v$oldVersion → v$newVersion" -ForegroundColor Green
+        Write-ChangelogSection -Version $newVersion
+    }
+
+    $installer = Join-Path $DotfilesRoot 'bootstrap\install.ps1'
+    if (Test-Path $installer) {
+        Write-Host "Re-running installer to apply updates..." -ForegroundColor Cyan
+        & $installer
+    } else {
+        Write-Host "Installer not found at $installer — skipping bootstrap." -ForegroundColor Yellow
+    }
+
+    if (Test-Path $PROFILE) {
+        Write-Host "Reloading `$PROFILE..." -ForegroundColor Cyan
+        . $PROFILE
+    }
+    Write-Host "Done." -ForegroundColor Green
 }
 
 # ── EDIT ─────────────────────────────────────────────────────────────────────
@@ -333,6 +429,7 @@ function Invoke-Agent {
 switch ($Command.ToLower()) {
     'help'     { Invoke-Help     -Query       $Arg1 }
     'list'     { Invoke-List }
+    'version'  { Invoke-Version }
     'register' { Invoke-Register -Name $Arg1 -Desc $Description }
     'update'   { Invoke-Update }
     'edit'     { Invoke-Edit }
@@ -340,7 +437,7 @@ switch ($Command.ToLower()) {
     'agent'    { Invoke-Agent    -Subarg $Arg1 -ExtraFlag $Arg2 }
     default {
         Write-Host "Unknown subcommand: '$Command'" -ForegroundColor Red
-        Write-Host "Usage: dotfiles <help|list|register|update|edit|explain|agent>" -ForegroundColor Yellow
+        Write-Host "Usage: dotfiles <help|list|version|register|update|edit|explain|agent>" -ForegroundColor Yellow
         exit 1
     }
 }
