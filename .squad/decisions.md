@@ -105,6 +105,18 @@ This document defines the authoritative structure for the dotfiles repo. Trinity
 
 ---
 
+### 6. Decision: One-Liner Installer Bootstrap and Push Account Management
+
+**Date:** 2026-06-02  
+**Author:** switch, tank  
+**Status:** ACTIVE
+
+**One-liner installers must self-bootstrap:** When piping scripts to `iex` (PowerShell) or `bash` (shell), `$PSScriptRoot` and `BASH_SOURCE` are empty because the script is read from stdin. All one-liner installers (`bootstrap/install.ps1`, `bootstrap/install.sh`) must detect this condition and automatically clone/pull the repo before executing the on-disk installer. PowerShell: check if `$PSScriptRoot` is empty; if so, clone/pull and re-invoke with `@PSBoundParameters`. Bash: check if `BASH_SOURCE` is not a real file; if so, clone/pull and re-exec with original args. This ensures identical behavior for both inline and on-disk execution paths.
+
+**Git account management for pushes:** Use `gh auth switch --user jmanuelcorral` to ensure the active gh account has write permissions to the repository. If a 403 permission denied error occurs and the gh CLI has drifted to a different account (e.g., `josecorral_microsoft`), explicitly switch back to `jmanuelcorral` before `git push`.
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus
