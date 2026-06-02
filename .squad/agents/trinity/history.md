@@ -37,7 +37,47 @@
 - Every external tool uses `Get-Command X -ErrorAction SilentlyContinue` before use.
 - Profile is safe on a fresh machine with nothing installed.
 
-### 2026-06-02 — Upcoming: Local AI Agent Feature
 
-**Context:** Oracle has researched local SLM backends (recommending Ollama + Phi-4-mini-instruct), and Morpheus has architected a 6-phase implementation plan. Once Jose approves, Trinity will own Phase 2 (PowerShell agent wrapper). The `dotfiles agent "<query>"` command will allow users to ask questions about aliases/tools with AI assistance, and `dotfiles explain <cmd>` will enhance command documentation. Trinity's responsibilities in Phase 2 will include PowerShell bindings to the Ollama localhost:11434 REST API and graceful degradation when the model is unavailable.
+### 2026-06-02 — Phase 3: Invoke-AgentQuery (llama-cli inference)
+
+**What was implemented**
+- Added `Invoke-AgentQuery` (exported) to `powershell/modules/dotfiles-agent.psm1`.
+- Added internal helpers `_Build-AgentPrompt`, `_Post-ProcessAgentOutput`, `_Format-ProcArg`.
+- Replaced the PHASE 3 PLACEHOLDER stub in `bin/dotfiles.ps1` `Invoke-Agent` with real wiring.
+
+**Prompt serialization contract (for Tank parity)**
+- Shell type token: `"windows-powershell"` (literal string).
+- Tools block: one line `"- {name}: {description}"` per tool; `"(none registered)"` when empty.
+- Aliases block: one line per alias key (skip `_`-prefixed metadata); format:
+  `"- {key}: {_note} [win: {windows}] [unix: {unix}]"` — bracket omitted when field absent.
+- ChatML envelope (LF line endings, no BOM):
+  ```
+  <|im_start|>system\n{filled-system-prompt}\n<|im_end|>\n
+  (for each few-shot object in few-shot.json:)
+  <|im_start|>{role}\n{content}\n<|im_end|>\n
+  <|im_start|>user\n{Query}\n<|im_end|>\n
+  <|im_start|>assistant\n
+  ```
+  (model appends completion after the final `\n`)
+
+**llama-cli flags (b9469)**
+`-m <model> -f <promptfile> --no-display-prompt -no-cnv --log-disable -n <n_predict> --temp <temp>`
+Prompt is written to a UTF-8 (no BOM) temp file via `[System.IO.File]::WriteAllText` to avoid all shell quoting issues.
+
+**Exit codes / degradation**
+- 2 = engine binary missing (prints "Agent engine not installed. Run: dotfiles agent --setup")
+- 3 = model file missing (prints "No model found. Run: dotfiles agent --setup")
+- 4 = timeout (kills process, prints advisory to use --fallback)
+- 1 = "# Cannot build: …" from model, or empty output
+- 0 = success
+
+**UX**
+- Default: prints the command in Cyan; best-effort `Set-Clipboard` (guarded, never fatal).
+- `--run` flag: prompts `Execute? [y/N]` before `Invoke-Expression`.
+
+**PS 5.1 / 7 compatibility notes**
+- Used `New-Object System.Diagnostics.ProcessStartInfo/Process` (not `::new()`) for max compat.
+- `WaitForExit(ms)` timeout with `ReadToEndAsync()` started before wait to prevent stdout deadlock.
+- `[System.IO.File]::WriteAllText` with `[System.Text.UTF8Encoding]::new($false)` for no-BOM UTF-8.
+
 

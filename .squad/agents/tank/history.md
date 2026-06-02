@@ -55,3 +55,14 @@
 ### 2026-06-02 — Upcoming: Local AI Agent Feature
 
 **Context:** Oracle has researched local SLM backends (recommending Ollama + Phi-4-mini-instruct), and Morpheus has architected a 6-phase implementation plan. Once Jose approves, Tank will own Phase 3 (bash/zsh agent parity). The `dotfiles agent "<query>"` command will allow users to ask questions about aliases/tools with AI assistance, and `dotfiles explain <cmd>` will enhance command documentation. Tank's responsibilities in Phase 3 will include bash/zsh bindings to the Ollama localhost:11434 REST API and graceful degradation when the model is unavailable — ensuring feature parity with PowerShell.
+
+### 2026-06-02 — Phase 4: bash/zsh agent inference implemented
+
+- **`awk -v` and multi-line values**: POSIX leaves behaviour undefined when the `-v` option value contains newlines. The aliases/tools blocks are multi-line. Chosen fix: export blocks as env vars inside a `$(...)` subshell and read them from awk's `ENVIRON[]` array — fully POSIX-compliant and avoids temp files for the blocks.
+- **sed regex with `{`**: `{{SHELL_TYPE}}` could theoretically be interpreted as an interval expression in some BRE dialects. In practice, GNU sed and macOS sed treat `{S` (non-digit after `{`) as literal; the pattern is safe. Using a simple `sed "s/{{SHELL_TYPE}}/$shell_type/g"` is correct since the replacement value is always `unix-bash` or `unix-zsh` (no special sed chars).
+- **ChatML trailing-newline parity with Trinity**: Trinity calls `.TrimEnd()` on the system prompt string before inserting it. In shell, command substitution `$(...)` automatically strips trailing newlines — equivalent behaviour without any extra code.
+- **awk exact-string match for block placeholders**: Using `$0 == "{{TOOLS_BLOCK}}"` (exact equality) rather than a regex avoids `{` quantifier interpretation issues in awk ERE entirely.
+- **jq `ENVIRON` vs `-v` note**: The `ENVIRON` approach works because within the subshell we `export` the variables before the pipeline starts; awk inherits them from its process environment.
+- **Exit code 4 from `timeout`**: GNU `timeout` exits 124 on expiry. The check `[ "$engine_rc" -eq 124 ]` maps this to our exit code 4, matching Trinity's `ExitCode = 4`.
+- **Clipboard order (WSL)**: `clip.exe` is tried first because in WSL it pipes directly to the Windows clipboard, which is the primary use-case. `xclip` and `wl-copy` serve native X11/Wayland environments.
+- **`zsh -n` not available in Git Bash env**: Used Git Bash 5.3 `bash -n` for syntax validation. POSIX-only constructs used throughout (`[ ]`, `local`, `command -v`, `printf`, `case`), so zsh compatibility is structurally guaranteed.

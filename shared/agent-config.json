@@ -1,0 +1,42 @@
+{
+  "_comment": "Agent engine + model configuration. SHA256 fields are null — checksums are impractical to pin without downloading the multi-hundred-MB artifacts. The downloader verifies integrity by: (1) file size is at least 70% and at most 150% of size_mb (a truncated/failed download is the real risk), and (2) llama-cli --version succeeding after extraction. Pin SHA256 values manually after first download if you need supply-chain hardening.",
+  "_owner": "Switch",
+  "engine": {
+    "version": "b9469",
+    "assets": {
+      "win-x64":    "llama-b9469-bin-win-cpu-x64.zip",
+      "win-arm64":  "llama-b9469-bin-win-cpu-arm64.zip",
+      "linux-x64":  "llama-b9469-bin-ubuntu-x64.tar.gz",
+      "linux-arm64": null
+    },
+    "base_url": "https://github.com/ggml-org/llama.cpp/releases/download/b9469/",
+    "sha256": {
+      "win-x64":    null,
+      "win-arm64":  null,
+      "linux-x64":  null,
+      "linux-arm64": null
+    }
+  },
+  "models": {
+    "primary": {
+      "name":    "qwen25coder-1.5b-q4_k_m",
+      "file":    "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+      "url":     "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+      "sha256":  null,
+      "size_mb": 1066
+    },
+    "fallback": {
+      "name":    "qwen25coder-0.5b-q4_k_m",
+      "file":    "qwen2.5-coder-0.5b-instruct-q4_k_m.gguf",
+      "url":     "https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q4_k_m.gguf",
+      "sha256":  null,
+      "size_mb": 469
+    }
+  },
+  "defaults": {
+    "model":           "primary",
+    "n_predict":       80,
+    "temp":            0,
+    "timeout_seconds": 60
+  }
+}

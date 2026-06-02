@@ -61,7 +61,24 @@
 - Piped-iex simulation for testing (`& { $(Get-Content … -Raw) } -NoPackages`) actually executes side effects on the real machine. For safe testing, patch the git-check to an always-true condition to confirm the error branch fires, rather than letting it clone.
 - The `$env:DOTFILES` override for the clone destination makes the one-liner idempotent for users who have already set a custom dotfiles location.
 
-### 2026-06-02 — Upcoming: Local AI Agent Feature
+### 2026-06-02 — Phase 1 + Phase 2: Local Agent Shared Assets + Bootstrap
 
-**Context:** Oracle has researched local SLM backends (recommending Ollama + Phi-4-mini-instruct), and Morpheus has architected a 6-phase implementation plan. Once Jose approves, Switch will own Phase 1 (shared agent assets + offline explain) and Phase 4 (installer updates + docs). Phase 1 will involve creating `shared/agent/` directory with prompt templates and the offline-first `dotfiles explain` implementation that reads `shared/aliases.json` and `shared/tools.json` directly. Phase 4 will update bootstrap installers to optionally install Ollama (via `-IncludeAgent` flag) and refresh documentation. Feature parity across shells is ensured in later phases by Trinity (Phase 2) and Tank (Phase 3).
+**Files created:**
+- `shared/agent/system-prompt.txt` — shell-agnostic prompt template with `{{SHELL_TYPE}}`, `{{TOOLS_BLOCK}}`, `{{ALIASES_BLOCK}}` placeholders
+- `shared/agent/few-shot.json` — 6 example pairs grounded in real aliases (ll, gl, gst, fd, rg)
+- `shared/agent-config.json` — pinned engine tag `b9469`, real HuggingFace model URLs, null SHA256 with documented verification strategy
+- `shell/lib/agent.sh` — POSIX-compatible install_agent_engine(), agent_paths(), agent_ready(); Phase 4 placeholder for Tank
+- `powershell/modules/dotfiles-agent.psm1` — Install-AgentEngine, Get-AgentPaths, Test-AgentReady; Phase 3 placeholder for Trinity
+
+**Files modified:**
+- `bin/dotfiles.ps1` — added Invoke-Explain (offline: aliases.json → tools.json → --help), Invoke-Agent (--setup wiring + Phase 3 stub), updated help/usage text, added `$Arg2` param, added explain + agent dispatch cases
+- `shell/common.sh` — added explain) and agent) cases to dotfiles() function; updated usage string
+- `.gitignore` — added `cache/` and `cache/*`
+
+**Key decisions:**
+- Engine tag `b9469` (latest as of 2026-06-02). Windows asset: `llama-b9469-bin-win-cpu-x64.zip`; Linux: `llama-b9469-bin-ubuntu-x64.tar.gz`
+- SHA256 pinning is `null` across all entries — impractical to compute without downloading multi-hundred-MB files. Integrity verified by: (1) file size within ±10% of `size_mb`, (2) `llama-cli --version` succeeding. Document in config + code.
+- `curl.exe -L -C -` preferred for resumable downloads on Windows; `Invoke-WebRequest` as fallback. Same `curl -L -C -` on bash.
+- `Unblock-File` applied to all extracted files on Windows (removes Zone.Identifier = 3 SmartScreen mark).
+- Inference logic (prompt build + subprocess + post-process) NOT implemented — Trinity owns Phase 3 (PS), Tank owns Phase 4 (bash). Clearly marked placeholders left in both modules.
 

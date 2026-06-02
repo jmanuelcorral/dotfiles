@@ -182,7 +182,8 @@ fi
 
 # ── dotfiles CLI helper ───────────────────────────────────────────────────────
 # Provides: dotfiles help [query] | dotfiles list | dotfiles update | dotfiles edit
-# Reads shared/tools.json and docs/cheatsheet.md.
+#           dotfiles explain <alias-or-tool> | dotfiles agent --setup [--fallback]
+# Reads shared/tools.json, shared/aliases.json, and docs/cheatsheet.md.
 # Uses fzf for interactive search when available, plain grep otherwise.
 dotfiles() {
     local cmd="${1:-help}"
@@ -246,8 +247,118 @@ dotfiles() {
             echo "dotfiles register: use the PowerShell CLI on Windows or edit shared/tools.json directly." >&2
             return 1
             ;;
+        explain)
+            # Offline explain: aliases.json → tools.json → <cmd> --help
+            local name="${1:-}"
+            if [ -z "$name" ]; then
+                echo "Usage: dotfiles explain <alias-or-tool>" >&2
+                return 1
+            fi
+            local aliases_json="${DOTFILES}/shared/aliases.json"
+            local tools_json="${DOTFILES}/shared/tools.json"
+            local found=0
+
+            # 1. Check aliases.json (requires jq; grep/sed fallback)
+            if [ -f "$aliases_json" ]; then
+                if command -v jq >/dev/null 2>&1; then
+                    local note win_form unix_form
+                    note=$(jq -r --arg k "$name" '.aliases[$k]._note // ""' "$aliases_json" 2>/dev/null)
+                    win_form=$(jq -r --arg k "$name" '.aliases[$k].windows // "(not defined)"' "$aliases_json" 2>/dev/null)
+                    unix_form=$(jq -r --arg k "$name" '.aliases[$k].unix // "(not defined)"' "$aliases_json" 2>/dev/null)
+                    if [ -n "$note" ] && [ "$note" != "null" ]; then
+                        echo ""
+                        echo "  $name — $note"
+                        echo ""
+                        echo "  Windows (PowerShell):"
+                        echo "    $win_form"
+                        echo ""
+                        echo "  Unix (bash/zsh):"
+                        echo "    $unix_form"
+                        echo ""
+                        found=1
+                    fi
+                else
+                    # grep/sed fallback: look for the key block heuristically
+                    if grep -q "\"$name\"" "$aliases_json" 2>/dev/null; then
+                        echo ""
+                        echo "  $name — (install jq for full alias details)"
+                        grep -A4 "\"$name\"" "$aliases_json" | grep -v "^--$" | head -6
+                        echo ""
+                        found=1
+                    fi
+                fi
+            fi
+
+            # 2. Check tools.json
+            if [ "$found" -eq 0 ] && [ -f "$tools_json" ]; then
+                if command -v jq >/dev/null 2>&1; then
+                    local desc path_val
+                    desc=$(jq -r --arg n "$name" '.tools[] | select(.name == $n) | .description // ""' "$tools_json" 2>/dev/null)
+                    path_val=$(jq -r --arg n "$name" '.tools[] | select(.name == $n) | .path // ""' "$tools_json" 2>/dev/null)
+                    if [ -n "$desc" ]; then
+                        echo ""
+                        echo "  $name — $desc"
+                        echo "  Path: $path_val"
+                        echo ""
+                        found=1
+                    fi
+                fi
+            fi
+
+            # 3. Fall back to --help
+            if [ "$found" -eq 0 ]; then
+                if command -v "$name" >/dev/null 2>&1; then
+                    echo "  '$name' not in registry — showing --help output:"
+                    echo ""
+                    "$name" --help 2>&1 | head -20 | sed 's/^/  /'
+                    echo ""
+                else
+                    echo "  '$name' not found in aliases.json, tools.json, or PATH." >&2
+                    echo "  Try: dotfiles help $name" >&2
+                    return 1
+                fi
+            fi
+            ;;
+        agent)
+            # Wire --setup; inference is Phase 4 (Tank)
+            local subarg="${1:-}"
+            local extraflag="${2:-}"
+            local agent_lib="${DOTFILES}/shell/lib/agent.sh"
+
+            if [ "$subarg" = "--setup" ]; then
+                if [ ! -f "$agent_lib" ]; then
+                    echo "dotfiles: agent lib not found at $agent_lib" >&2
+                    return 1
+                fi
+                # shellcheck source=/dev/null
+                . "$agent_lib"
+                if [ "$extraflag" = "--fallback" ]; then
+                    install_agent_engine --fallback
+                else
+                    install_agent_engine
+                fi
+                return $?
+            fi
+
+            if [ -n "$subarg" ] && [ "${subarg#--}" = "$subarg" ]; then
+                if [ ! -f "$agent_lib" ]; then
+                    echo "dotfiles: agent lib not found at $agent_lib" >&2
+                    return 1
+                fi
+                # shellcheck source=/dev/null
+                . "$agent_lib"
+                dotfiles_agent "$subarg" "${extraflag:-}"
+                return $?
+            fi
+
+            echo "Usage:"
+            echo "  dotfiles agent --setup             Download engine + primary model"
+            echo "  dotfiles agent --setup --fallback  Download engine + 0.5B model"
+            echo "  dotfiles agent \"<query>\"           Generate a shell command"
+            echo "  dotfiles agent \"<query>\" --run     Generate and optionally execute"
+            ;;
         *)
-            echo "Usage: dotfiles <help|list|update|edit> [query]" >&2
+            echo "Usage: dotfiles <help|list|update|edit|explain|agent> [args]" >&2
             return 1
             ;;
     esac

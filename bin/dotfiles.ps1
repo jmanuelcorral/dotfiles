@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    dotfiles CLI — manage your dotfiles, tools, and command cheatsheet.
+    dotfiles CLI — manage your dotfiles, tools, aliases, and local AI agent.
 .DESCRIPTION
     Subcommands:
         help    [query]            Show the command cheatsheet + registered tools.
@@ -12,23 +12,36 @@
                                    shared/tools.json. Use -Description to describe it.
         update                     git pull inside $env:DOTFILES and reload $PROFILE.
         edit                       Open the dotfiles repo in $EDITOR / VS Code / notepad.
+        explain <alias-or-tool>    Show the definition and both-shell forms of an alias
+                                   or registered tool — fully offline, no model needed.
+                                   Falls back to running '<cmd> --help' when not found.
+        agent --setup [--fallback] Download the llama-cli engine and Qwen2.5-Coder model
+                                   into cache/. Use --fallback for the smaller 0.5B model.
+        agent "<query>"            Generate a shell command via local inference.
+        agent "<query>" --run      Generate and prompt to execute.
 .PARAMETER Command
     Subcommand to run. Default: help.
 .PARAMETER Arg1
-    First positional argument (tool name for 'register', search query for 'help').
+    First positional argument (tool name for 'register'/'explain', query for 'help',
+    or flag like '--setup' for 'agent').
 .PARAMETER Description
     Description string for 'register'.
 .EXAMPLE
     dotfiles help
     dotfiles help git
+    dotfiles explain ll
+    dotfiles explain gst
     dotfiles register gituseswitch -Description "Switch git user identity"
     dotfiles list
     dotfiles update
     dotfiles edit
+    dotfiles agent --setup
+    dotfiles agent --setup --fallback
 #>
 param(
     [Parameter(Position = 0)] [string]$Command     = 'help',
     [Parameter(Position = 1)] [string]$Arg1        = '',
+    [Parameter(Position = 2)] [string]$Arg2        = '',
     [string]$Description = ''
 )
 
@@ -38,6 +51,7 @@ $ErrorActionPreference = 'Stop'
 # Resolve the repo root: bin/dotfiles.ps1 → parent is repo root
 $DotfilesRoot = if ($env:DOTFILES) { $env:DOTFILES } else { Split-Path $PSScriptRoot -Parent }
 $ToolsJson    = Join-Path $DotfilesRoot 'shared\tools.json'
+$AliasesJson  = Join-Path $DotfilesRoot 'shared\aliases.json'
 $Cheatsheet   = Join-Path $DotfilesRoot 'docs\cheatsheet.md'
 
 # ── Data helpers ──────────────────────────────────────────────────────────────
@@ -206,7 +220,115 @@ function Invoke-Edit {
     & $editor $DotfilesRoot
 }
 
-# ── Dispatch ─────────────────────────────────────────────────────────────────
+# ── EXPLAIN (offline) ────────────────────────────────────────────────────────
+
+function Invoke-Explain {
+    param([string]$Name)
+
+    if (-not $Name) {
+        Write-Host "Usage: dotfiles explain <alias-or-tool>" -ForegroundColor Yellow
+        return
+    }
+
+    # 1. Look up in aliases.json
+    if (Test-Path $AliasesJson) {
+        $aliases = (Get-Content $AliasesJson -Raw | ConvertFrom-Json).aliases
+        # PSCustomObject property lookup — use Get-Member to check existence
+        $aliasEntry = $null
+        if ($null -ne $aliases -and ($aliases | Get-Member -Name $Name -ErrorAction SilentlyContinue)) {
+            $aliasEntry = $aliases.$Name
+        }
+        if ($null -ne $aliasEntry) {
+            $note    = if ($aliasEntry | Get-Member -Name '_note'   -ErrorAction SilentlyContinue) { $aliasEntry.'_note'   } else { '' }
+            $winForm = if ($aliasEntry | Get-Member -Name 'windows' -ErrorAction SilentlyContinue) { $aliasEntry.windows } else { '(not defined)' }
+            $nixForm = if ($aliasEntry | Get-Member -Name 'unix'    -ErrorAction SilentlyContinue) { $aliasEntry.unix    } else { '(not defined)' }
+
+            Write-Host ""
+            Write-Host "  $Name — $note" -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host "  Windows (PowerShell):" -ForegroundColor Yellow
+            Write-Host "    $winForm" -ForegroundColor White
+            Write-Host ""
+            Write-Host "  Unix (bash/zsh):" -ForegroundColor Yellow
+            Write-Host "    $nixForm" -ForegroundColor White
+            Write-Host ""
+            return
+        }
+    }
+
+    # 2. Look up in tools.json
+    $data = Get-ToolsData
+    $tool = $data.tools | Where-Object { $_.name -eq $Name } | Select-Object -First 1
+    if ($null -ne $tool) {
+        Write-Host ""
+        Write-Host "  $Name — $($tool.description)" -ForegroundColor Cyan
+        Write-Host "  Path: $($tool.path)" -ForegroundColor DarkGray
+        Write-Host ""
+        return
+    }
+
+    # 3. Fall back to --help (first 20 lines) if the command exists
+    $cmd = Get-Command $Name -ErrorAction SilentlyContinue
+    if ($null -ne $cmd) {
+        Write-Host "  '$Name' not in registry — showing --help output:" -ForegroundColor DarkGray
+        Write-Host ""
+        try {
+            & $Name --help 2>&1 | Select-Object -First 20 | ForEach-Object { Write-Host "  $_" }
+        } catch {
+            Write-Host "  (could not run '$Name --help')" -ForegroundColor DarkGray
+        }
+        Write-Host ""
+        return
+    }
+
+    # 4. Nothing found
+    Write-Host "  '$Name' not found in aliases.json, tools.json, or PATH." -ForegroundColor Yellow
+    Write-Host "  Try: dotfiles help $Name" -ForegroundColor DarkGray
+}
+
+# ── AGENT ─────────────────────────────────────────────────────────────────────
+
+function Invoke-Agent {
+    param([string]$Subarg, [string]$ExtraFlag)
+
+    $psm1Path = Join-Path $DotfilesRoot 'powershell\modules\dotfiles-agent.psm1'
+
+    if ($Subarg -eq '--setup') {
+        if (-not (Test-Path $psm1Path)) {
+            Write-Host "Agent module not found at: $psm1Path" -ForegroundColor Red
+            exit 1
+        }
+        Import-Module $psm1Path -Force
+        $useFallback = ($ExtraFlag -eq '--fallback')
+        Install-AgentEngine -Fallback:$useFallback
+        return
+    }
+
+    # ── Query inference (Phase 3) ─────────────────────────────────────────────
+    # A non-empty $Subarg that doesn't start with '--' is the natural-language query.
+    # $ExtraFlag == '--run' → pass -Run to Invoke-AgentQuery (prompt before execute).
+    if ($Subarg -and -not $Subarg.StartsWith('--')) {
+        if (-not (Test-Path $psm1Path)) {
+            Write-Host "Agent module not found at: $psm1Path" -ForegroundColor Red
+            exit 2
+        }
+        Import-Module $psm1Path -Force
+        $runFlag = ($ExtraFlag -eq '--run')
+        $result  = Invoke-AgentQuery -Query $Subarg -Run:$runFlag
+        # Map result exit codes: 0=ok, 1=cannot-build, 2=engine missing,
+        #                        3=model missing, 4=timeout
+        exit $result.ExitCode
+    }
+
+    # Unknown flag or bare 'agent' with no args
+    Write-Host "Usage:" -ForegroundColor Yellow
+    Write-Host "  dotfiles agent --setup             Download engine + primary model" -ForegroundColor White
+    Write-Host "  dotfiles agent --setup --fallback  Download engine + 0.5B model" -ForegroundColor White
+    Write-Host "  dotfiles agent ""<query>""           Generate a shell command" -ForegroundColor White
+    Write-Host "  dotfiles agent ""<query>"" --run     Generate and prompt to execute" -ForegroundColor White
+}
+
+
 
 switch ($Command.ToLower()) {
     'help'     { Invoke-Help     -Query       $Arg1 }
@@ -214,9 +336,11 @@ switch ($Command.ToLower()) {
     'register' { Invoke-Register -Name $Arg1 -Desc $Description }
     'update'   { Invoke-Update }
     'edit'     { Invoke-Edit }
+    'explain'  { Invoke-Explain  -Name        $Arg1 }
+    'agent'    { Invoke-Agent    -Subarg $Arg1 -ExtraFlag $Arg2 }
     default {
         Write-Host "Unknown subcommand: '$Command'" -ForegroundColor Red
-        Write-Host "Usage: dotfiles <help|list|register|update|edit>" -ForegroundColor Yellow
+        Write-Host "Usage: dotfiles <help|list|register|update|edit|explain|agent>" -ForegroundColor Yellow
         exit 1
     }
 }

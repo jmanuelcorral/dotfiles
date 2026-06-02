@@ -240,26 +240,30 @@ Both PowerShell and bash must build the prompt identically:
 2. Replace `{{SHELL_TYPE}}` with current shell (e.g., `windows-powershell`)
 3. Replace `{{TOOLS_BLOCK}}` with serialized `tools.json` (one line per tool: `name: description`)
 4. Replace `{{ALIASES_BLOCK}}` with serialized `aliases.json` (one line per alias)
-5. Append few-shot examples in ChatML format if the model supports it, or inline
-6. Append user query
+5. Append few-shot examples as plain text under an `EXAMPLES:` header, one
+   `user => assistant` line per pair from `few-shot.json`
 
-**Final prompt to llama-cli:**
+The assembled text is the **system prompt** only. It is written to a temp file
+and passed via `-sysf`; the live user query is passed separately via `-p`.
+
+**Invocation recipe (b9469 — conversation single-turn mode):**
+
+> llama-cli b9469 split the binaries: raw one-shot completion (`-no-cnv`) is
+> rejected ("please use llama-completion instead"), and `llama-completion`
+> needs a real console (exits 130 under a redirected subprocess). The working
+> path is therefore **llama-cli in single-turn conversation mode**.
+
 ```
-<|im_start|>system
-{system prompt with injected tools/aliases}
-<|im_end|>
-<|im_start|>user
-{few-shot user 1}
-<|im_end|>
-<|im_start|>assistant
-{few-shot assistant 1}
-<|im_end|>
-... (few-shot pairs) ...
-<|im_start|>user
-{actual user query}
-<|im_end|>
-<|im_start|>assistant
+llama-cli -m <model> -sysf <system-prompt-file> -p "<user query>" \
+          -st --simple-io --no-display-prompt -n 80 --temp 0
 ```
+
+- The model's own chat template wraps the `-sysf` system prompt and the `-p`
+  user turn — we do NOT emit raw `<|im_start|>` ChatML ourselves.
+- PowerShell invokes via `System.Diagnostics.Process` with each arg added to
+  `ArgumentList` (so the multi-word `-p` value is never re-split) and
+  `CreateNoWindow = $false` (conversation mode needs to share a console).
+- bash invokes via `timeout <sec>s llama-cli ...` directly.
 
 ### Output guardrails (llama-cli flags)
 
@@ -268,16 +272,19 @@ Both PowerShell and bash must build the prompt identically:
 | `--temp 0` | 0 | Deterministic, no creative hallucination |
 | `-n 80` | 80 | Single command never needs more tokens |
 | `--no-display-prompt` | - | Don't echo the input prompt |
-| `--single-turn` | - | Exit after first response |
-| `--log-disable` | - | No logging to stderr |
+| `-st` | - | Single-turn: exit after the first reply |
+| `--simple-io` | - | Basic IO for subprocess compatibility |
 
 ### Post-processing
 
-1. Strip markdown fences (` ```bash `) if present
-2. Strip leading `$` or `> ` prompt characters
-3. Trim whitespace
-4. If result starts with `#`, treat as "cannot build" message
-5. Extract first non-empty line as the command
+llama-cli conversation mode prints a banner, the echoed user turn as a `> <query>`
+line, the reply, then `[ Prompt: ...]` / `[ Generation: ...]` stats and `Exiting...`.
+
+1. Take the text AFTER the last `> ` line and BEFORE the stats/`Exiting` markers
+2. Strip markdown fence markers (` ```bash `, ` ``` `) but keep their content
+3. Strip leading `$ ` or `> ` prompt characters and surrounding backticks
+4. Trim whitespace; take the first non-empty line as the command
+5. If the result starts with `# Cannot build`, treat it as a refusal (exit 1)
 
 ---
 

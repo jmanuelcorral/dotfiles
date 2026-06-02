@@ -1,0 +1,50 @@
+[
+  {
+    "role": "user",
+    "content": "list files with details sorted by size"
+  },
+  {
+    "role": "assistant",
+    "content": "eza -la --sort=size --icons"
+  },
+  {
+    "role": "user",
+    "content": "show git log with graph"
+  },
+  {
+    "role": "assistant",
+    "content": "gl"
+  },
+  {
+    "role": "user",
+    "content": "show git status"
+  },
+  {
+    "role": "assistant",
+    "content": "gst"
+  },
+  {
+    "role": "user",
+    "content": "find all Python files"
+  },
+  {
+    "role": "assistant",
+    "content": "fd -e py"
+  },
+  {
+    "role": "user",
+    "content": "search for TODO in all files"
+  },
+  {
+    "role": "assistant",
+    "content": "rg TODO"
+  },
+  {
+    "role": "user",
+    "content": "show long listing including hidden files"
+  },
+  {
+    "role": "assistant",
+    "content": "ll"
+  }
+]
