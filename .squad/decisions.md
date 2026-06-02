@@ -121,9 +121,9 @@ This document defines the authoritative structure for the dotfiles repo. Trinity
 
 **Date:** 2026-06-02  
 **Author:** Oracle  
-**Status:** PROPOSED — awaiting implementation approval
+**Status:** SUPERSEDED by Decision #10 (2026-06-02)
 
-**Ollama + Phi-4-mini-instruct**
+**Original Proposal: Ollama + Phi-4-mini-instruct**
 - Install: `winget install Ollama.Ollama` (Windows) / `curl https://ollama.ai/install.sh | sh` (WSL)
 - Model pull: `ollama pull phi4-mini` (~2.3 GB, MIT license)
 - Invocation: OpenAI-compatible REST at `localhost:11434/v1/chat/completions`
@@ -132,15 +132,17 @@ This document defines the authoritative structure for the dotfiles repo. Trinity
 
 Full research: `docs/research/local-agent-2026.md`
 
+**Superseded by:** Decision #10 — Self-Contained Local Agent (No-Daemon) — Oracle Revised Recommendation
+
 ---
 
 ### 8. Decision: Local Agent Architecture Plan (6-Phase Implementation)
 
 **Date:** 2026-06-02  
 **Author:** Morpheus  
-**Status:** PROPOSED — awaiting Jose's approval before implementation
+**Status:** SUPERSEDED by Decision #11 (2026-06-02)
 
-Architectural plan for `dotfiles agent "<query>"` and `dotfiles explain <cmd>`:
+Architectural plan for `dotfiles agent "<query>"` and `dotfiles explain <cmd>` — Original (Ollama-based):
 - **Phase 1 (Switch):** Shared agent assets + offline explain
 - **Phase 2 (Trinity):** PowerShell agent wrapper
 - **Phase 3 (Tank):** bash/zsh agent parity
@@ -149,6 +151,100 @@ Architectural plan for `dotfiles agent "<query>"` and `dotfiles explain <cmd>`:
 - **Phase 6 (Oracle):** Benchmarking
 
 Full plan: `docs/plans/local-agent-plan.md`
+
+**Superseded by:** Decision #11 — Self-Contained Local Agent Architecture (Supersedes #7/#8)
+
+---
+
+### 9. Decision: User Directive — Reject Ollama, Require Self-Contained Agent
+
+**Date:** 2026-06-02T10:41:57Z  
+**Author:** Jose (via Copilot)  
+**Status:** ACCEPTED
+
+**Directive:** Reject Ollama as the backend for the `dotfiles agent` feature. Jose requires a **self-contained agent** — no background daemon/server. Preference: dotfiles ships or downloads a self-contained inference binary + a small model file, invoked per-call as a one-shot subprocess, portable across Windows + WSL, offline.
+
+**Rationale:** User preference supersedes Decisions #7 and #8 (Ollama + Phi-4-mini approach). The architecture must be revised to a self-contained approach before any implementation proceeds.
+
+**Outcome:** Triggers immediate revision of #7 and #8 by Oracle and Morpheus.
+
+---
+
+### 10. Decision: Self-Contained Local Agent (No-Daemon) — Oracle Revised Recommendation
+
+**Date:** 2026-06-02T10:41:57Z  
+**Author:** Oracle  
+**Status:** ACCEPTED — supersedes Decision #7 (Ollama + Phi-4-mini)
+
+**Revised Recommendation:** `llama-cli` (llama.cpp CPU binary) + `Qwen2.5-Coder-1.5B-Instruct Q4_K_M`
+
+| Component | Detail |
+|---|---|
+| Engine | `llama-cli` prebuilt CPU-only binary from `ggml-org/llama.cpp` GitHub Releases |
+| Engine binary size | ~9 MB compressed / ~15 MB extracted (Win: exe + ggml.dll + llama.dll; Linux: single binary) |
+| Model | `Qwen2.5-Coder-1.5B-Instruct` Q4_K_M GGUF |
+| Model size | ~986 MB |
+| Model source | `Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF` on HuggingFace |
+| License | Engine: MIT; Model: Apache 2.0 — no per-machine ToS friction |
+| Cold start per call | ~5–8 s on modern laptop CPU with SSD |
+| Daemon required | ❌ None — one-shot subprocess, exits when done |
+| Python required | ❌ None |
+| Portability | Windows x64/arm64 + Linux x64/arm64 + WSL2 |
+| Invocation | Identical args from PowerShell and bash (`--no-display-prompt --single-turn --log-disable -n 80 --temp 0`) |
+| Offline | ✅ Fully offline after one-time `dotfiles agent --setup` |
+
+**Lighter Fallback:** same engine + `Qwen2.5-Coder-0.5B-Instruct Q4_K_M` (~3–5 s per call, ~572 MB on disk) for ≤4 GB RAM machines.
+
+**Key Implementation Notes:**
+- Setup script (`dotfiles agent --setup`): Detect OS + arch, download pinned llama.cpp release ZIP/tar.gz from GitHub Releases with SHA256 verification, extract to `$DOTFILES\cache\bin\`; Windows: run `Unblock-File` on extracted files; Linux: `chmod +x`.
+- Invocation pattern (both shells, same args): `llama-cli -m <model.gguf> --no-display-prompt --single-turn --log-disable -n 80 --temp 0 -p "<prompt>"`
+- Cache layout (add `cache/` to `.gitignore`): `$env:DOTFILES\cache\bin\` → binaries; `$env:DOTFILES\cache\models\` → GGUF model files.
+- Graceful degradation: If `$DOTFILES\cache\bin\llama-cli(.exe)` is absent, fall through to offline JSON-only `dotfiles explain` path.
+
+**Full Research:** `docs/research/local-agent-2026.md` — "Self-Contained (No-Daemon) Options — Revised per Jose" section.
+
+---
+
+### 11. Decision: Self-Contained Local Agent Architecture (Supersedes #7/#8)
+
+**Date:** 2026-06-02T10:41:57Z  
+**Author:** Morpheus (Lead / Architect)  
+**Status:** ACCEPTED — supersedes Decisions #7 and #8
+
+**Decision:** Replace Ollama + Phi-4-mini with llama-cli + Qwen2.5-Coder-1.5B.
+
+| Component | Original (Ollama) | Revised (Self-Contained) |
+|-----------|-------------------|--------------------------|
+| Engine | Ollama daemon (always-on) | `llama-cli` binary (one-shot subprocess) |
+| Invocation | REST API (`localhost:11434`) | Direct subprocess call |
+| Primary model | Phi-4-mini (3.8B, ~2.3 GB) | Qwen2.5-Coder-1.5B Q4_K_M (~986 MB) |
+| Fallback model | Qwen2.5-Coder-1.5B (~1 GB) | Qwen2.5-Coder-0.5B Q4_K_M (~572 MB) |
+| Cold start | ~1–4 s (warm cache) | ~5–8 s (no warm state) |
+| Daemon required | ✅ Yes | ❌ No |
+| Offline | After Ollama + model install | After one-time `--setup` |
+
+**Key Changes to Implementation Plan:**
+1. **No REST API calls** — PowerShell uses `& llama-cli.exe ...`, bash uses `./llama-cli ...`
+2. **New setup phase** — `dotfiles agent --setup` downloads engine + model with SHA256 verification
+3. **Cache directory** — `$DOTFILES/cache/bin/` and `$DOTFILES/cache/models/` (gitignored)
+4. **Windows SmartScreen** — Setup script calls `Unblock-File` on downloaded executables
+5. **Model changed** — Qwen2.5-Coder-1.5B is faster to cold-start than Phi-4-mini
+6. **No AI-enhanced explain** — `explain` is 100% offline (registry lookup only)
+
+**Revised Phase-to-Agent Mapping:**
+| Phase | Owner | Focus |
+|-------|-------|-------|
+| 1 | Switch | Shared assets + offline `explain` + config |
+| 2 | Switch | First-run bootstrap (downloader) |
+| 3 | Trinity | PowerShell `agent` subcommand |
+| 4 | Tank | Bash/zsh `agent` parity |
+| 5 | Switch | Documentation + DX polish |
+| 6 | Oracle + Scribe | Validation + tuning + decisions log |
+
+**References:**
+- Full revised plan: `docs/plans/local-agent-plan.md`
+- Oracle's research: `docs/research/local-agent-2026.md` → "Self-Contained (No-Daemon) Options"
+- Jose's directive: Decision #9
 
 ---
 

@@ -2,8 +2,283 @@
 
 **Author:** Oracle  
 **Requested by:** Jose (jmanuelcorral)  
-**Status:** Proposed — for Trinity / Switch to implement  
+**Status:** REVISED — Ollama rejected by Jose; see "Self-Contained" section below  
 **Scope:** `dotfiles agent "<query>"` and `dotfiles explain <cmd>` subcommands
+
+---
+
+## Self-Contained (No-Daemon) Options — Revised per Jose
+
+> **Constraint change (2026-06-02):** Jose has rejected Ollama and any always-on daemon or background server.  
+> The new requirement: inference runs as a **one-shot subprocess per call** — a static binary + GGUF model  
+> file downloaded into `$env:DOTFILES\cache\` on first run. Zero always-on processes. Fully offline after setup.  
+> Portable across Windows (PowerShell) and WSL/Linux (bash/zsh). CPU-only must be viable on a dev laptop.
+
+---
+
+### SC-1 — llama.cpp as a Self-Contained One-Shot CLI ✅ Leading Candidate
+
+#### What it is
+
+`llama-cli` is the command-line inference binary from the [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) project.
+It loads a GGUF model, evaluates the prompt, writes output to stdout, and exits. **No server, no daemon, no port.**
+The project publishes prebuilt binaries on every release (multiple times per week as of mid-2026).
+
+#### Binary acquisition
+
+- **Releases:** `https://github.com/ggml-org/llama.cpp/releases`
+- **Windows x64 (CPU):** `llama-{build}-bin-win-cpu-x64.zip` — ~9 MB compressed  
+  Extracts to: `llama-cli.exe` (~5 MB), `ggml.dll`, `llama.dll` (all three required, ~15 MB total extracted)
+- **Windows ARM64:** `llama-{build}-bin-win-cpu-arm64.zip` — ~9.7 MB
+- **Linux x86_64:** `llama-{build}-bin-ubuntu-x64.tar.gz` — ~9 MB
+- **Linux arm64:** `llama-{build}-bin-ubuntu-arm64.tar.gz`
+- **Version pinning:** release URLs encode the build number (e.g., `b9196`); the setup script pins to a tested build and verifies SHA256 before use.
+- **CPU-only build:** default `win-cpu-*` / `ubuntu-*` targets AVX2; no CUDA/Vulkan dependencies.
+
+#### One-shot invocation — identical args on both shells
+
+```
+llama-cli -m <model.gguf> --no-display-prompt --single-turn --log-disable \
+  -n 80 --temp 0 -p "<prompt text>"
+```
+
+**PowerShell:**
+```powershell
+$out = & "$env:DOTFILES\cache\bin\llama-cli.exe" `
+  -m "$env:DOTFILES\cache\models\qwen25coder-1.5b-q4_k_m.gguf" `
+  --no-display-prompt --single-turn --log-disable `
+  -n 80 --temp 0 -p $prompt
+```
+
+**bash/WSL:**
+```bash
+out=$("$DOTFILES/cache/bin/llama-cli" \
+  -m "$DOTFILES/cache/models/qwen25coder-1.5b-q4_k_m.gguf" \
+  --no-display-prompt --single-turn --log-disable \
+  -n 80 --temp 0 -p "$prompt")
+```
+
+The argument set is **OS-agnostic** — only shell quoting differs. No platform-specific branches for the inference call itself.
+
+#### Cold-start latency per call (no warm cache)
+
+| Model | RAM needed | Disk load (NVMe) | 50-tok gen (CPU) | Total per call |
+|---|---|---|---|---|
+| Qwen2.5-Coder-0.5B Q4_K_M | ~1 GB | ~1–2 s | ~2–3 s | **~3–5 s** |
+| Qwen2.5-Coder-1.5B Q4_K_M | ~2 GB | ~2–3 s | ~3–5 s | **~5–8 s** |
+| Phi-4-mini 3.8B Q4_K_M | ~4 GB | ~5–8 s | ~6–12 s | **~11–20 s** |
+
+Since there is no warm state, every call incurs model-load cost. For the "produce one shell command" task with ≤80 output tokens, the 1.5B model is ideal: fast enough for a dev CLI, quality sufficient for grounded command generation.
+
+#### Strengths
+- Zero external runtime dependencies (C++ static binary, AVX2 CPU-only build)
+- Works fully offline after setup
+- Identical invocation from PowerShell and bash (same flags, same exe path logic)
+- No daemon, no server, no open port, no background process
+- Tiny binary footprint: ~9 MB download, ~15 MB extracted
+- Active project; releases ship multiple times per week
+- Windows (x64/arm64) + Linux (x64/arm64) + macOS all covered
+
+#### Weaknesses / Caveats
+- **Windows SmartScreen:** Downloaded unsigned `.exe` gets `Zone.Identifier = 3` (internet-marked).  
+  Setup script must call `Unblock-File` on `llama-cli.exe` and each DLL to remove the mark,  
+  or the OS will block execution with a security warning on first run.
+- **Windows DLLs:** The CPU build ships `ggml.dll` + `llama.dll` alongside the EXE — the full ZIP must be extracted, not just the EXE alone. All three files go to `$DOTFILES\cache\bin\`.
+- **Cold start per call:** 3–8 s depending on model — acceptable for a CLI tool the user explicitly invoked, but no warm path. This is the main trade-off vs. Ollama.
+- **Linux chmod:** `chmod +x` required after download; trivial but must be in setup script.
+- **Per-OS binary selection:** Setup script must detect OS+arch (`$env:PROCESSOR_ARCHITECTURE` on Windows, `uname -m` on Linux) to select the correct release archive URL.
+
+#### Verdict
+✅ **Leading candidate.** Best tradeoff: tiny binary, zero dependencies, truly one-shot, scriptable identically from both shells, offline-first.
+
+---
+
+### SC-2 — ONNX Runtime GenAI Self-Contained
+
+#### Option (a): model-qa/model-chat C++ binary
+
+No official prebuilt standalone C++ CLI binary is published in `onnxruntime-genai` releases. The `model-qa` example exists as a buildable sample in the repo, not a downloadable artifact. Building it requires ONNX Runtime SDK + C++ toolchain + CMake — far too much friction for a dotfiles setup script.
+
+**Verdict:** ❌ Not viable. Would require Jose (or CI) to build and host the binary.
+
+#### Option (b): Python script using `onnxruntime_genai`
+
+- Install: `pip install onnxruntime-genai` (~100 MB package)
+- Model: `microsoft/Phi-4-mini-instruct-onnx` from HuggingFace (~2.3 GB download)
+- Invocation: `python dotfiles-agent.py "<prompt>"` — Python interpreter + model load per call
+- Cold start per call: **8–20 s** (Python startup + full model deserialisation each call)
+- DirectML acceleration: available on Windows for GPU path; not available in WSL
+- Offline after install: yes
+
+**vs. llama-cli:** ONNX GenAI is strictly worse on cold-start latency (Python overhead adds 2–5 s before model even loads), requires Python/pip, and provides no benefit unless the user specifically needs DirectML GPU acceleration or prefers the ONNX-format Phi models.
+
+**Verdict:** ⚠️ Valid only if DirectML GPU acceleration is a hard requirement. Not appropriate for the "minimal, no-daemon, portable" goal. If Jose wants ONNX/DirectML, wrap in a thin `bin/dotfiles-agent.py` and call from PowerShell via `python`; but this is the ONNX specialist path, not the primary recommendation.
+
+---
+
+### SC-3 — Single-File and Other Static Options
+
+#### llamafile (Cosmopolitan Libc)
+
+**What:** A single executable that bundles the llama.cpp runtime using [Cosmopolitan](https://justine.lol/cosmopolitan/) — one file runs on Linux, macOS, and Windows from the same binary. The model can optionally be bundled inside the file (making it truly one artifact), or loaded from an external path like any GGUF file.
+
+- **Runtime-only llamafile:** ~7 MB (runtime without model)
+- **Model-bundled llamafile:** runtime + GGUF = e.g., Qwen2.5-Coder-0.5B Q4_K_M → ~579 MB; Qwen2.5-Coder-1.5B → ~993 MB
+- **Windows 4 GB mmap limit:** llamafile uses `mmap` to load the bundled model region. On Windows, this fails for files larger than ~4 GB due to a PE + mmap interaction. For small models (0.5B ≈ 579 MB, 1.5B ≈ 993 MB), this is **well under the limit** and works fine. Models ≥2 GB bundled risk this issue on Windows. (Using llamafile as a runtime-only binary with an external GGUF sidesteps this entirely but removes the single-file advantage.)
+- **Windows execution:** rename `.llamafile` → `.exe` (or run directly in newer versions). SmartScreen still applies — same `Unblock-File` treatment needed as llama-cli.
+- **Linux:** `chmod +x` + run directly.
+- **Invocation:** `./model.llamafile -p "<prompt>" --no-display-prompt -n 80 --temp 0` — same flags as llama-cli (it IS llama.cpp underneath).
+- **Project status (mid-2026):** Originally Mozilla-backed; maintained by Justine Tunney. Slower release cadence than llama.cpp main. Model architecture support follows llama.cpp with a lag.
+- **Pros:** Truly single-file distribution (runtime bundled in model file). No separate binary download — one file download covers everything.
+- **Cons:** Cannot swap models without downloading a new llamafile per model. Bundled-model path defeats the "shared engine, swappable model" design the dotfiles repo wants. SmartScreen requires the same installer intervention as llama-cli. The single-file advantage is less compelling when the installer already manages a cache dir.
+
+**Verdict:** 🔄 Notable and technically elegant. For the dotfiles use case (cache dir, swappable model, separate engine), llama-cli provides more flexibility with comparable simplicity. Llamafile's main win (single download = everything) is only relevant if we commit to one specific model forever. Worth revisiting if the repo decides to ship a pinned tiny model with zero configuration.
+
+#### llama-cpp-python
+
+Python package embedding llama.cpp as a C extension. Prebuilt wheels exist for Windows + Linux. Adds Python/pip dependency with no benefit over llama-cli if Python isn't otherwise required. Per-call latency is comparable (C++ inference underneath), but startup includes Python interpreter load.
+
+**Verdict:** ❌ Adds friction without benefit. Use `llama-cli` binary directly.
+
+#### .NET options (LLamaSharp / Microsoft.ML.OnnxRuntimeGenAI)
+
+- **LLamaSharp:** .NET 8+ wrapper around llama.cpp. Viable for an in-process C# tool but adds .NET runtime as a dependency. More complex than calling `llama-cli` as a subprocess.
+- **Microsoft.ML.OnnxRuntimeGenAI (NuGet):** In-process .NET path for ONNX models. Same dependency story.
+- Neither is relevant for bash/PowerShell scripting context — they target .NET host processes.
+
+**Verdict:** ❌ Not applicable for the current shell-script invocation pattern.
+
+---
+
+### SC-4 — Model Choice for Self-Contained Setup
+
+Task: short natural-language prompt → ONE shell command, grounded in registered tools/aliases. Output budget: ≤80 tokens. Latency budget: ideally <10 s per call on CPU. Constraint: GGUF format (llama-cli compatible).
+
+| Model | Params | Q4_K_M GGUF size | RAM needed | License | Shell task quality | Cold start (CPU) |
+|---|---|---|---|---|---|---|
+| **Qwen2.5-Coder-1.5B-Instruct** | 1.5B | **~986 MB** | ~2 GB | Apache 2.0 | ★★★★☆ | ~5–8 s |
+| **Qwen2.5-Coder-0.5B-Instruct** | 0.5B | **~572 MB** | ~1 GB | Apache 2.0 | ★★★☆☆ | ~3–5 s |
+| Phi-4-mini-instruct | 3.8B | ~1.89 GB | ~4 GB | MIT | ★★★★★ | ~11–20 s |
+| Llama-3.2-1B-Instruct | 1B | ~700 MB | ~2 GB | Llama 3.2 | ★★★☆☆ | ~4–6 s |
+| SmolLM2-1.7B-Instruct | 1.7B | ~1.2 GB | ~2.5 GB | Apache 2.0 | ★★★☆☆ | ~5–8 s |
+
+**Primary model: `Qwen2.5-Coder-1.5B-Instruct Q4_K_M` (~986 MB)**  
+- Apache 2.0 license: no per-machine ToS, zero friction on fresh machines  
+- Shell/code-specialized training; outperforms many 7B general models on shell/bash tasks per published benchmarks  
+- 32K context window: ample for serialised tools.json + aliases.json (≈2–4 KB)  
+- ~5–8 s total per call on a modern laptop CPU: acceptable for an explicit user query  
+- Source: `Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF` on HuggingFace
+
+**Tiny fallback: `Qwen2.5-Coder-0.5B-Instruct Q4_K_M` (~572 MB)**  
+- Same HuggingFace org (`Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF`), same Apache 2.0 license  
+- For machines with ≤4 GB RAM, tight disk, or where ~3 s latency is preferred over quality  
+- Runs at >30 tokens/s on any modern CPU  
+- Quality is adequate for simple, well-grounded command lookups; higher hallucination risk on complex queries
+
+**Why NOT Phi-4-mini as primary here:**  
+Phi-4-mini (3.8B, ~1.89 GB) delivers the highest quality but cold-start is 11–20 s per call on CPU — unacceptable for a terminal workflow where the user expects a quick response. Phi-4-mini was the right pick for Ollama (warm cache = 1–4 s after load); without a daemon, the cold-start penalty makes it the wrong choice.
+
+---
+
+### SC-5 — Distribution & Portability Mechanics
+
+#### Cache layout (under `$env:DOTFILES`, NOT in git)
+
+```
+$env:DOTFILES\
+  cache\
+    bin\
+      llama-cli.exe          # Windows PE binary
+      ggml.dll               # required alongside llama-cli.exe (Windows)
+      llama.dll              # required alongside llama-cli.exe (Windows)
+      llama-cli              # Linux ELF binary (chmod +x on setup)
+    models\
+      qwen25coder-1.5b-q4_k_m.gguf   # primary model (~986 MB)
+      qwen25coder-0.5b-q4_k_m.gguf   # fallback model (~572 MB, optional)
+```
+
+Add `cache/` to `.gitignore`. Git LFS is explicitly wrong here: LFS would force every clone to download 1–2 GB of binary model data — unacceptable for a dotfiles repo that should clone in seconds.
+
+#### Download-on-first-run flow
+
+`dotfiles agent --setup` (or auto-triggered on first `dotfiles agent` call with no binary/model found):
+
+1. **Detect OS + arch:**
+   - Windows: `$env:PROCESSOR_ARCHITECTURE` → `AMD64` or `ARM64`
+   - Linux/WSL: `uname -m` → `x86_64` or `aarch64`
+2. **Select release archive URL** (pinned build number, e.g., `b9196`):
+   - Windows x64: `https://github.com/ggml-org/llama.cpp/releases/download/b9196/llama-b9196-bin-win-cpu-x64.zip`
+   - Linux x64:   `https://github.com/ggml-org/llama.cpp/releases/download/b9196/llama-b9196-bin-ubuntu-x64.tar.gz`
+   - Linux arm64: `https://github.com/ggml-org/llama.cpp/releases/download/b9196/llama-b9196-bin-ubuntu-arm64.tar.gz`
+3. **Download + verify SHA256** (`Get-FileHash` on PowerShell; `sha256sum` on Linux). Abort if mismatch.
+4. **Extract** to `$DOTFILES\cache\bin\`
+5. **Platform post-processing:**
+   - Windows: `Unblock-File` on `llama-cli.exe`, `ggml.dll`, `llama.dll` → removes `Zone.Identifier` stream, prevents SmartScreen execution block. (Execution policy does NOT apply to `.exe` — only `.ps1`.)
+   - Linux: `chmod +x "$DOTFILES/cache/bin/llama-cli"`
+6. **Download GGUF model:**
+   `https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf`
+7. **Verify model SHA256** against pinned expected value.
+
+#### Offline behavior
+
+- Once binary + model are in cache: **fully offline**. No network calls during inference.
+- If cache missing at invocation time: print clear error + setup instructions. Do NOT hang silently.
+- `dotfiles explain` JSON-only fallback is always available offline regardless of cache state.
+
+#### Windows SmartScreen and execution policy
+
+- SmartScreen applies to downloaded unsigned `.exe` files (Zone.Identifier = 3 from internet download).
+- `Unblock-File` in the setup script removes the mark; no admin rights required.
+- PowerShell execution policy does NOT affect native `.exe` files.
+- The setup script itself is a `.ps1`; the existing bootstrap execution-policy bypass already covers it.
+
+#### Linux / WSL notes
+
+- Ubuntu x64 build targets glibc 2.35+ → works on Ubuntu 22.04+ and WSL2 running Ubuntu 22.04/24.04.
+- Alpine/musl: not covered by the Ubuntu build; a musl-static variant may exist in releases — out of scope for typical dev machine.
+- WSL2 on Windows: the Linux binary runs natively inside WSL; no need to call the Windows `.exe` from bash.
+
+---
+
+### SC-6 — Clear Recommendation (Self-Contained, No-Daemon)
+
+#### Primary: `llama-cli` + `Qwen2.5-Coder-1.5B-Instruct Q4_K_M`
+
+| Attribute | Value |
+|---|---|
+| Engine | `llama-cli` prebuilt CPU binary (ggml-org/llama.cpp releases) |
+| Binary download | ~9 MB compressed / ~15 MB extracted (Win: exe + 2 DLLs; Linux: single binary) |
+| Model | `Qwen2.5-Coder-1.5B-Instruct Q4_K_M` GGUF |
+| Model download | ~986 MB from HuggingFace |
+| License | Apache 2.0 (engine: MIT; model: Apache 2.0) — no per-machine ToS friction |
+| Cold start per call | ~5–8 s on modern laptop CPU (SSD) |
+| Offline | ✅ Fully offline after one-time setup |
+| No daemon | ✅ One-shot subprocess; exits when done |
+| Python | ❌ Not required |
+| Portability | Windows x64/arm64 + Linux x64/arm64 + WSL2 |
+| Shell invocation | Identical args from PowerShell and bash |
+
+#### Lighter fallback: same engine + `Qwen2.5-Coder-0.5B-Instruct Q4_K_M`
+
+- Switch only the model path; same llama-cli binary, same flags
+- ~3–5 s per call, ~572 MB on disk
+- Suitable for machines with ≤4 GB RAM or where latency < quality
+
+#### Self-Contained Options Comparison Table
+
+| Option | Binary size | Model size | Cold start | Daemon? | Python? | Win SmartScreen | Linux | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| **llama-cli + Qwen 1.5B** | ~9 MB zip | ~986 MB | 5–8 s | ❌ | ❌ | Unblock-File | chmod +x | ✅ **Primary** |
+| llama-cli + Qwen 0.5B | ~9 MB zip | ~572 MB | 3–5 s | ❌ | ❌ | Unblock-File | chmod +x | ✅ Fallback |
+| llamafile + Qwen 0.5B | ~579 MB (1 file) | bundled | 3–5 s | ❌ | ❌ | Unblock-File | chmod +x | 🔄 Notable |
+| ONNX GenAI Python (Phi-4-mini) | via pip | ~2.3 GB | 8–20 s | ❌ | ✅ required | N/A | via Python | ⚠️ DirectML specialist |
+| llama-cli + Phi-4-mini 3.8B | ~9 MB zip | ~1.89 GB | 11–20 s | ❌ | ❌ | Unblock-File | chmod +x | ❌ Too slow CPU |
+| Ollama + any model | installer | varies | 1–4 s warm | ✅ required | ❌ | via winget | via curl | ❌ Rejected by Jose |
+
+---
+> **⚠️ The sections below describe the previous Ollama-based recommendation.**  
+> **They are SUPERSEDED by the self-contained analysis above following Jose's rejection of Ollama.**  
+> Kept for reference; do not implement.
 
 ---
 
