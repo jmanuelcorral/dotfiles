@@ -46,6 +46,25 @@
 - `$fontDone` flag pattern mirrors the `$installed` flag already used in the package loop — consistent style.
 - Font reminder printed unconditionally (outside the skip block) so the user always sees the "set your font" message even on re-runs.
 
+### 2026-06-05 — Bilingual Console Tools Documentation
+
+**Task:** Create hands-on developer guide covering every tool provisioned by dotfiles (winget/scoop/apt packages + aliases).
+
+**Files created:**
+- `docs/console/README.md` — bilingual landing page with tool inventory table
+- `docs/console/console.en.md` — 16 sections, English hands-on guide
+- `docs/console/console.es.md` — 16 sections, Spanish structural mirror
+
+**Files updated:**
+- `docs/commands/README.md` — added pointer to docs/console/
+- `README.md` (root) — added pointers in EN and ES sections
+
+**Verification:** EN ↔ ES structural parity confirmed (16–17 sections each). All aliases verified against `shared/aliases.json`. Platform callouts (🪟 Windows / 🐧 Unix/WSL) applied consistently.
+
+**Decision:** Filed as Decision #13 in `.squad/decisions.md`.
+
+---
+
 ### 2026-06-02 — Self-Bootstrap for `irm … | iex` one-liner
 
 **Bug fixed:** `bootstrap/install.ps1` line 32 (`$RepoRoot = Split-Path $PSScriptRoot -Parent`) crashed when the script was piped via `irm … | iex` because `$PSScriptRoot` is empty in that context — no file on disk.
@@ -102,3 +121,41 @@
 - Keep the version out of shell constants; always read from `VERSION`.
 - Use `git pull --ff-only` for update, not rebase, to make the version transition deterministic and avoid unexpected history rewrites.
 - Full installer rerun is intentional because install scripts are idempotent and bootstrap/package registration may change between versions.
+
+### 2026-06-05 — Bilingual Console Productivity Guide
+
+**Files created:**
+- `docs/console/README.md` — bilingual index with tool-inventory quick-reference table (tool · replaces · one-liner · platform) and links to both language guides.
+- `docs/console/console.en.md` — full English guide covering every tool provisioned by the dotfiles repo across 16 sections.
+- `docs/console/console.es.md` — natural castellano translation, structurally identical to the English guide.
+
+**Files modified:**
+- `docs/commands/README.md` — added one-line pointer to `docs/console/` in the "See Also" section.
+- `README.md` — added one-line pointer to `docs/console/` in both English and Spanish "Re-installing / Updating" sections, mirroring the existing `docs/commands/` pointer pattern.
+
+**Tools documented:** eza (ls aliases), bat (cat alias), fd (find alias), ripgrep/rg (grep alias), fzf (shell integration + key bindings), zoxide (z/zi), delta (git pager), jq, yq (Unix), duf (Unix), git + all aliases from shared/aliases.json (g/ga/gc/gst/gp/gl/gd), gh CLI, oh-my-posh (Windows), starship (Unix), gsudo/sudo, volta (Windows), and all navigation/utility aliases (../.../..../up/mkcd/cdot/reload/open/env/export/history/head/tail/ps/kill/df/du/top/which/mkdir).
+
+**Conventions established:**
+- `docs/console/` follows the same pattern as `docs/commands/` — one README index plus EN and ES guide files.
+- Platform notes use `🪟 Windows` / `🐧 Unix/WSL` inline callouts.
+- Each tool section: what it is / what it replaces · everyday invocations with example output · at least one power combo chaining tools.
+- "Recipes" section near end combines multiple tools for real tasks.
+- Ground-truth aliases sourced exclusively from `shared/aliases.json` — no invented aliases.
+- Binary quirks (fdfind, batcat) sourced from `packages/apt.json` `_binary_quirks`.
+
+
+**Files created:**
+- `docs/commands/README.md` — bilingual landing page: quick-reference table, language links, tips on `dotfiles help` and `dotfiles explain`.
+- `docs/commands/commands.en.md` — full English developer guide (all 9 subcommands, deep-dives for `agent` and `skills`, 6 workflow recipes).
+- `docs/commands/commands.es.md` — faithful Spanish translation, structurally identical to EN for parallel maintenance.
+
+**Files modified:**
+- `README.md` — added one-line pointer to `docs/commands/` in both English and Spanish "Re-install / Update" sections.
+
+**Key decisions:**
+- Ground truth sourced by reading `bin/dotfiles.ps1` (full), `shell/common.sh` (full), and `shared/agent-config.json` before writing a single word. No behavior invented.
+- `register` is explicitly documented as PowerShell-only on Unix — the Unix function returns an error directing users to PowerShell or manual JSON editing, which is exactly what the code does.
+- `explain` documented as 100% offline (no model required) — important distinction from `agent`.
+- Each guide section uses a Platform notes table; agent section includes a full component table (engine, model sizes, licenses, cold-start times) sourced from `agent-config.json` and `decisions.md` #10/#11.
+- EN and ES are structurally mirrored (same headings, same example blocks, same section order) so future updates can be done in parallel.
+- README pointers kept intentionally minimal — one callout line each, inside existing "update" sections.

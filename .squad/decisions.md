@@ -298,6 +298,58 @@ Add **one line** to the repo `README.md` (both languages) pointing to `docs/comm
 
 ---
 
+### 13. Decision: Console Tools Documentation — Bilingual Hands-On Guide
+
+**Date:** 2026-06-05  
+**Author:** Switch  
+**Status:** ACTIVE
+
+## Summary
+
+Created a bilingual (English + Spanish) "working in the console" developer guide under `docs/console/`. This complements the existing `docs/commands/` CLI reference, which only documents the `dotfiles` command itself.
+
+## What Was Added
+
+### New files
+
+| File | Purpose |
+|---|---|
+| `docs/console/README.md` | Bilingual index: tool-inventory quick-reference table + language links |
+| `docs/console/console.en.md` | Full English hands-on guide (16 sections, ~25 KB) |
+| `docs/console/console.es.md` | Full Spanish guide — structural mirror of EN (same sections, same order, same examples) |
+
+### Modified files
+
+| File | Change |
+|---|---|
+| `docs/commands/README.md` | Added one-line pointer to `docs/console/` in "See Also" |
+| `README.md` | Added one-line pointer in both English and Spanish sections (mirrors existing `docs/commands/` pointer pattern) |
+
+## Tools Covered
+
+Every tool provisioned by `packages/winget.json`, `packages/scoop.json`, and `packages/apt.json`:
+
+- **Modern CLI replacements:** eza, bat, fd, ripgrep (rg), fzf, zoxide, delta, jq, yq (Unix), duf (Unix)
+- **Git workflow:** git + all aliases from `shared/aliases.json` (g/ga/gc/gst/gp/gl/gd), delta as pager
+- **GitHub:** gh CLI (auth, repo, pr, issue, run)
+- **Shell environment:** oh-my-posh (Windows), starship (Unix/WSL), gsudo/sudo, volta
+- **Navigation/utility aliases:** all entries from `shared/aliases.json` (../.../..../up/mkcd/cdot/reload/open/env/export/history/head/tail/ps/kill/df/du/top/which/mkdir)
+
+## Conventions Established (for future console docs)
+
+1. **Platform callout style:** `🪟 Windows — ...` / `🐧 Unix/WSL — ...` inline blocks.
+2. **Tool section structure:** 1-2 line description + replaces · everyday examples · expected output (where helpful) · power combo.
+3. **Alias accuracy:** All alias expansions verified against `shared/aliases.json` before writing. No invented aliases.
+4. **Binary quirk sourcing:** `batcat`/`fdfind` notes sourced from `packages/apt.json` `_binary_quirks`.
+5. **EN ↔ ES mirror:** Both guides have identical section order and heading structure for parallel maintenance.
+
+## Recommended Follow-up (optional, not blocking)
+
+- If new tools are added to `packages/*.json`, add a section to both `console.en.md` and `console.es.md`.
+- Consider linking `docs/console/` from `docs/cheatsheet.md` as a "deeper reading" reference.
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus
