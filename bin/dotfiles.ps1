@@ -21,6 +21,10 @@
                                    into cache/. Use --fallback for the smaller 0.5B model.
         agent "<query>"            Generate a shell command via local inference.
         agent "<query>" --run      Generate and prompt to execute.
+        skills list                List available skills in skills/ with their descriptions.
+        skills path                Print the absolute path of the skills/ directory.
+        skills install [target]    Copy all skills into <target>\.copilot\skills\.
+                                   Default target = current directory. Idempotent.
 .PARAMETER Command
     Subcommand to run. Default: help.
 .PARAMETER Arg1
@@ -40,6 +44,10 @@
     dotfiles edit
     dotfiles agent --setup
     dotfiles agent --setup --fallback
+    dotfiles skills list
+    dotfiles skills path
+    dotfiles skills install
+    dotfiles skills install C:\Projects\myapp
 #>
 param(
     [Parameter(Position = 0)] [string]$Command     = 'help',
@@ -426,6 +434,77 @@ function Invoke-Agent {
 
 
 
+# ── SKILLS ────────────────────────────────────────────────────────────────────
+
+function Invoke-Skills {
+    param([string]$Action, [string]$Target)
+
+    $SkillsRoot = Join-Path $DotfilesRoot 'skills'
+
+    if (-not (Test-Path $SkillsRoot)) {
+        Write-Host "  ⚠ skills/ directory not found at: $SkillsRoot" -ForegroundColor Yellow
+        return
+    }
+
+    switch ($Action.ToLower()) {
+        'list' {
+            $skillDirs = Get-ChildItem $SkillsRoot -Directory
+            if ($skillDirs.Count -eq 0) {
+                Write-Host "No skills found in $SkillsRoot" -ForegroundColor Yellow
+                return
+            }
+            Write-Host "`nAvailable skills in skills/" -ForegroundColor Cyan
+            Write-Host ""
+            foreach ($dir in $skillDirs) {
+                $skillFile = Join-Path $dir.FullName 'SKILL.md'
+                $desc = ''
+                if (Test-Path $skillFile) {
+                    $raw = Get-Content $skillFile -Raw
+                    if ($raw -match '(?m)^description:\s*"?([^"\r\n]+)"?') {
+                        $desc = $Matches[1].Trim()
+                    }
+                }
+                Write-Host ("  {0}  {1}" -f $dir.Name.PadRight(30), $desc) -ForegroundColor White
+            }
+            Write-Host ""
+        }
+        'path' {
+            Write-Host $SkillsRoot
+        }
+        'install' {
+            $destBase = if ($Target) { $Target } else { $PWD.Path }
+            $destSkills = Join-Path $destBase '.copilot\skills'
+
+            $skillDirs = Get-ChildItem $SkillsRoot -Directory
+            if ($skillDirs.Count -eq 0) {
+                Write-Host "No skills to install (skills/ is empty)." -ForegroundColor Yellow
+                return
+            }
+
+            New-Item -ItemType Directory -Path $destSkills -Force | Out-Null
+
+            $count = 0
+            foreach ($dir in $skillDirs) {
+                $destSkill = Join-Path $destSkills $dir.Name
+                Copy-Item -Path $dir.FullName -Destination $destSkill -Recurse -Force
+                Write-Host "  ✓ $($dir.Name)" -ForegroundColor Green
+                $count++
+            }
+            Write-Host ""
+            Write-Host "  $count skill(s) installed → $destSkills" -ForegroundColor Cyan
+        }
+        default {
+            Write-Host "Usage:" -ForegroundColor Yellow
+            Write-Host "  dotfiles skills list                List available skills with descriptions" -ForegroundColor White
+            Write-Host "  dotfiles skills path                Print the skills/ directory path" -ForegroundColor White
+            Write-Host "  dotfiles skills install [target]    Copy skills into <target>\.copilot\skills\" -ForegroundColor White
+        }
+    }
+}
+
+
+
+
 switch ($Command.ToLower()) {
     'help'     { Invoke-Help     -Query       $Arg1 }
     'list'     { Invoke-List }
@@ -435,9 +514,10 @@ switch ($Command.ToLower()) {
     'edit'     { Invoke-Edit }
     'explain'  { Invoke-Explain  -Name        $Arg1 }
     'agent'    { Invoke-Agent    -Subarg $Arg1 -ExtraFlag $Arg2 }
+    'skills'   { Invoke-Skills   -Action $Arg1 -Target $Arg2 }
     default {
         Write-Host "Unknown subcommand: '$Command'" -ForegroundColor Red
-        Write-Host "Usage: dotfiles <help|list|version|register|update|edit|explain|agent>" -ForegroundColor Yellow
+        Write-Host "Usage: dotfiles <help|list|version|register|update|edit|explain|agent|skills>" -ForegroundColor Yellow
         exit 1
     }
 }

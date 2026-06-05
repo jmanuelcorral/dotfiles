@@ -71,9 +71,37 @@ git clone https://github.com/jmanuelcorral/dotfiles.git ~/dotfiles
 | **PSReadLine tuned** | History search, syntax highlighting, better keybindings |
 | **Tab completions** | For `git`, `gh`, `winget`, `scoop`, and more |
 | **WSL bash/zsh parity** | Shared aliases and config for bash & zsh |
-| **`dotfiles` CLI helper** | `dotfiles help|list|version|register|update|edit` |
+| **`dotfiles` CLI helper** | `dotfiles help|list|version|register|update|edit|skills` |
 | **Extensible** | Register your own scripts in one command |
 | **Idempotent** | Safe to re-run — skips what's already installed |
+
+---
+
+### Installing Reusable Agent Skills
+
+The repo ships a library of portable [Copilot skills](skills/) under `skills/`. Install them all into any project with one command:
+
+```powershell
+# Windows — install into the current project
+dotfiles skills install
+
+# or into a specific directory
+dotfiles skills install C:\Projects\myapp
+```
+
+```bash
+# Unix / WSL
+dotfiles skills install
+dotfiles skills install ~/projects/myapp
+```
+
+This copies every `skills/<name>/` folder into `<target>/.copilot/skills/`, creating the directory if needed. The operation is idempotent — re-running overwrites existing skill files (they are repo-owned).
+
+Browse what's available:
+```powershell
+dotfiles skills list   # name + description from each SKILL.md frontmatter
+dotfiles skills path   # print the skills/ directory
+```
 
 ---
 
@@ -121,6 +149,9 @@ dotfiles update
 # Unix / WSL
 $DOTFILES/bootstrap/install.sh
 ```
+
+> **Full command reference:** [`docs/commands/`](docs/commands/) — bilingual developer guide covering every subcommand with examples.  
+> **Console productivity guide:** [`docs/console/`](docs/console/) — learn to use every tool this repo provisions (eza, bat, fzf, zoxide, rg, gh, jq…).
 
 ---
 
@@ -234,9 +265,37 @@ git clone https://github.com/jmanuelcorral/dotfiles.git ~/dotfiles
 | **PSReadLine optimizado** | Búsqueda en historial, resaltado de sintaxis, atajos mejorados |
 | **Completado con Tab** | Para `git`, `gh`, `winget`, `scoop` y más |
 | **Paridad bash/zsh en WSL** | Alias y config compartidos para bash y zsh |
-| **Herramienta CLI `dotfiles`** | `dotfiles help|list|version|register|update|edit` |
+| **Herramienta CLI `dotfiles`** | `dotfiles help|list|version|register|update|edit|skills` |
 | **Extensible** | Registra tus propios scripts con un solo comando |
 | **Idempotente** | Seguro para volver a ejecutar — omite lo que ya está instalado |
+
+---
+
+### Instalar skills de agente reutilizables
+
+El repositorio incluye una biblioteca de [Copilot skills](skills/) portátiles en `skills/`. Instálalas todas en cualquier proyecto con un solo comando:
+
+```powershell
+# Windows — instalar en el proyecto actual
+dotfiles skills install
+
+# o en un directorio concreto
+dotfiles skills install C:\Projects\miapp
+```
+
+```bash
+# Unix / WSL
+dotfiles skills install
+dotfiles skills install ~/projects/miapp
+```
+
+Esto copia cada carpeta `skills/<nombre>/` en `<destino>/.copilot/skills/`, creando el directorio si es necesario. La operación es idempotente — volver a ejecutarla sobreescribe los archivos existentes (son propiedad del repo).
+
+Ver qué hay disponible:
+```powershell
+dotfiles skills list   # nombre + descripción de cada frontmatter SKILL.md
+dotfiles skills path   # muestra el directorio skills/
+```
 
 ---
 
@@ -284,6 +343,9 @@ dotfiles update
 # Unix / WSL
 $DOTFILES/bootstrap/install.sh
 ```
+
+> **Referencia completa de comandos:** [`docs/commands/`](docs/commands/) — guía bilingüe para desarrolladores con todos los subcomandos y ejemplos.  
+> **Guía de productividad en consola:** [`docs/console/`](docs/console/) — aprende a usar todas las herramientas que instala este repositorio (eza, bat, fzf, zoxide, rg, gh, jq…).
 
 ---
 

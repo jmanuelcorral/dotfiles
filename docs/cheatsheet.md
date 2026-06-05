@@ -138,6 +138,9 @@ Run `dotfiles help <keyword>` to filter, or just `dotfiles help` for interactive
 | `dotfiles version` | Show VERSION and git commit |
 | `dotfiles update` | Fast-forward pull + version report + bootstrap rerun |
 | `dotfiles edit` | Open dotfiles repo in editor |
+| `dotfiles skills list` | List available reusable agent skills |
+| `dotfiles skills path` | Print the skills/ directory path |
+| `dotfiles skills install [dir]` | Copy all skills into `<dir>/.copilot/skills/` (default: cwd) |
 
 ---
 

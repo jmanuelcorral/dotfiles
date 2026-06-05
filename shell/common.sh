@@ -419,8 +419,62 @@ dotfiles() {
             echo "  dotfiles agent \"<query>\"           Generate a shell command"
             echo "  dotfiles agent \"<query>\" --run     Generate and optionally execute"
             ;;
+        skills)
+            local skills_action="${1:-}"
+            local skills_target="${2:-}"
+            local skills_root="${DOTFILES}/skills"
+
+            if [ ! -d "$skills_root" ]; then
+                echo "dotfiles: skills/ directory not found at $skills_root" >&2
+                return 1
+            fi
+
+            case "$skills_action" in
+                list)
+                    echo ""
+                    echo "Available skills in skills/"
+                    echo ""
+                    for skill_dir in "$skills_root"/*/; do
+                        [ -d "$skill_dir" ] || continue
+                        skill_name="$(basename "$skill_dir")"
+                        skill_file="${skill_dir}SKILL.md"
+                        desc=""
+                        if [ -f "$skill_file" ]; then
+                            desc="$(grep -m1 '^description:' "$skill_file" 2>/dev/null \
+                                | sed 's/^description:[[:space:]]*//;s/^"//;s/"$//')"
+                        fi
+                        printf '  %-30s %s\n' "$skill_name" "$desc"
+                    done
+                    echo ""
+                    ;;
+                path)
+                    echo "$skills_root"
+                    ;;
+                install)
+                    local dest_base="${skills_target:-$(pwd)}"
+                    local dest_skills="${dest_base}/.copilot/skills"
+                    mkdir -p "$dest_skills"
+                    count=0
+                    for skill_dir in "$skills_root"/*/; do
+                        [ -d "$skill_dir" ] || continue
+                        skill_name="$(basename "$skill_dir")"
+                        cp -R "$skill_dir" "${dest_skills}/${skill_name}"
+                        echo "  ✓ $skill_name"
+                        count=$((count + 1))
+                    done
+                    echo ""
+                    echo "  $count skill(s) installed → $dest_skills"
+                    ;;
+                *)
+                    echo "Usage:"
+                    echo "  dotfiles skills list                List available skills with descriptions"
+                    echo "  dotfiles skills path                Print the skills/ directory path"
+                    echo "  dotfiles skills install [target]    Copy skills into <target>/.copilot/skills/"
+                    ;;
+            esac
+            ;;
         *)
-            echo "Usage: dotfiles <help|list|version|update|edit|explain|agent> [args]" >&2
+            echo "Usage: dotfiles <help|list|version|update|edit|explain|agent|skills> [args]" >&2
             return 1
             ;;
     esac
