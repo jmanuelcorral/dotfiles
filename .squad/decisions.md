@@ -248,6 +248,56 @@ Full plan: `docs/plans/local-agent-plan.md`
 
 ---
 
+### 12. Decision: CLI Documentation Structure — Bilingual Guides under docs/commands/
+
+**Date:** 2026-06-05  
+**Author:** Switch  
+**Status:** ACTIVE
+
+---
+
+## Context
+
+Jose requested a bilingual (English + Spanish) developer guide covering every `dotfiles` command. The cheatsheet (`docs/cheatsheet.md`) already exists as a quick-reference; we needed a deeper, example-driven teaching guide.
+
+## Decision
+
+### Output location: `docs/commands/`
+
+All CLI documentation lives under `docs/commands/`:
+
+| File | Purpose |
+|---|---|
+| `docs/commands/README.md` | Bilingual landing page: quick-reference table + language links |
+| `docs/commands/commands.en.md` | Full English developer guide |
+| `docs/commands/commands.es.md` | Full Spanish developer guide |
+
+Rationale: keeps `docs/` uncluttered; a dedicated subdirectory signals that more per-topic guides can follow the same pattern.
+
+### Mirrored 1:1 structure (EN ↔ ES)
+
+Both language files use **identical section order and heading names** (in their respective languages) so diffs between them are immediately meaningful. A maintainer editing one file can apply the same change to the other by structural analogy without reading prose.
+
+### Ground-truth-first writing rule
+
+Before writing, the author **must** read the actual source files (`bin/dotfiles.ps1`, `shell/common.sh`, `shared/agent-config.json`) and document what the code does — not what it could do or should do. Any behavior that is "Phase N placeholder" must be labelled as such.
+
+### Platform notes pattern
+
+Every command section includes a **Platform notes** table covering: available in PowerShell? available in bash/zsh? any behavioral differences? This is a repeatable pattern for future command additions.
+
+### README pointer pattern
+
+Add **one line** to the repo `README.md` (both languages) pointing to `docs/commands/` — inside an existing section, never as a standalone section. Keep it minimal so it doesn't dominate the install-focused README.
+
+## Consequences
+
+- New commands added to `bin/dotfiles.ps1` + `shell/common.sh` **must** also be documented in both `commands.en.md` and `commands.es.md`, in the same section order.
+- The `docs/commands/README.md` quick-reference table must be kept in sync with the command dispatch in both shell files.
+- Version references in these docs should always point readers to the root `VERSION` file, never hardcode a version string.
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus
